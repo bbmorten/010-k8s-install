@@ -1,0 +1,169 @@
+---
+# Playbook: kubernetes_installation.yml
+# Purpose: Install Kubernetes 1.32 on Ubuntu 24.04 nodes
+# Compatible with the provided inventory structure
+
+- name: Install Kubernetes 1.32 on Ubuntu 24.04
+  hosts: k8s_cluster
+  gather_facts: true
+  any_errors_fatal: true
+  
+  tasks:
+    # Update and upgrade system packages
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+        force_apt_get: yes
+        cache_valid_time: 3600
+    
+    # Install required packages
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+    
+    # Configure required kernel modules
+    - name: Load overlay module
+      modprobe:
+        name: overlay
+        state: present
+    
+    - name: Load br_netfilter module
+      modprobe:
+        name: br_netfilter
+        state: present
+    
+    # Ensure modules load at boot
+    - name: Ensure modules load at boot
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+        mode: '0644'
+    
+    # Configure kernel parameters
+    - name: Set sysctl params for Kubernetes
+      copy:
+        dest: /etc/sysctl.d/k8s.conf
+        content: |
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.bridge.bridge-nf-call-iptables = 1
+          net.ipv4.ip_forward = 1
+        owner: root
+        group: root
+        mode: '0644'
+    
+    - name: Apply sysctl parameters without reboot
+      command: sysctl --system
+      changed_when: false
+    
+    # Disable swap
+    - name: Check swap status
+      command: swapon --show
+      register: swap_status
+      changed_when: false
+    
+    - name: Disable all swap spaces
+      command: swapoff -a
+      when: swap_status.stdout != ""
+    
+    - name: Comment swap entry in /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\sswap\s.*)$'
+        replace: '#\1'
+        backup: yes
+      when: swap_status.stdout != ""
+    
+    # Install containerd
+    - name: Install containerd
+      apt:
+        name: containerd
+        state: present
+    
+    - name: Create containerd configuration directory
+      file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'
+    
+    - name: Generate default containerd config
+      shell: |
+        containerd config default > /etc/containerd/config.toml
+      args:
+        creates: /etc/containerd/config.toml
+    
+    - name: Configure containerd to use SystemdCgroup
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: 'SystemdCgroup = false'
+        replace: 'SystemdCgroup = true'
+    
+    - name: Restart containerd
+      systemd:
+        name: containerd
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+    
+    # Install Kubernetes 1.32
+    - name: Create keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+    
+    - name: Add Kubernetes signing key
+      shell: |
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | gpg --batch --yes --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        executable: /bin/bash
+      register: add_key
+      # Use 'creates' to make it idempotent
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    
+    - name: Add Kubernetes 1.32 repository
+      copy:
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        content: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /'
+        mode: '0644'
+    
+    - name: Update apt cache after adding Kubernetes repository
+      apt:
+        update_cache: yes
+    
+    - name: Install Kubernetes components
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+      register: k8s_installation
+    
+    - name: Hold Kubernetes packages at their current version
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+      when: k8s_installation.changed
+    
+    # Verify installation
+    - name: Verify kubectl version
+      command: kubectl version --client
+      register: kubectl_version
+      changed_when: false
+    
+    - name: Display kubectl version
+      debug:
+        var: kubectl_version.stdout_lines

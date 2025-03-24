@@ -1,0 +1,84 @@
+---
+# Playbook: join_worker_nodes.yml
+# Purpose: Join worker nodes to the Kubernetes cluster
+# Compatible with Ubuntu 24.04 and Kubernetes 1.32
+
+- name: Retrieve join command from control plane
+  hosts: control_plane
+  gather_facts: false
+  tasks:
+    - name: Check if join command exists
+      stat:
+        path: /home/{{ ansible_user }}/k8s_join_command.sh
+      register: join_command_file
+      
+    - name: Fail if join command doesn't exist
+      fail:
+        msg: "Join command not found. Please initialize the cluster first."
+      when: not join_command_file.stat.exists
+      
+    - name: Get join command
+      command: cat /home/{{ ansible_user }}/k8s_join_command.sh
+      register: join_command
+      changed_when: false
+      
+    - name: Set join command as a fact
+      set_fact:
+        k8s_join_command: "{{ join_command.stdout }}"
+
+- name: Join worker nodes to Kubernetes cluster
+  hosts: workers
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    # Prerequisite checks before joining
+    - name: Check if Kubernetes is already joined
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: k8s_joined
+      
+    - name: Check if swap is disabled
+      shell: swapon --show
+      register: swap_status
+      changed_when: false
+      
+    - name: Fail if swap is enabled
+      fail:
+        msg: "Swap is still enabled. Please disable swap before joining the cluster."
+      when: swap_status.stdout != ""
+      
+    - name: Check if containerd is running
+      systemd:
+        name: containerd
+        state: started
+      register: containerd_status
+      check_mode: true
+      failed_when: false
+      changed_when: false
+      
+    - name: Fail if containerd is not running
+      fail:
+        msg: "Containerd is not running. Please ensure containerd is properly installed and running."
+      when: containerd_status.status.ActiveState != "active"
+    
+    # Join worker nodes to the cluster
+    - name: Join worker node to the cluster
+      command: "{{ hostvars[groups['control_plane'][0]]['k8s_join_command'] }}"
+      register: join_result
+      when: not k8s_joined.stat.exists
+      
+    - name: Display join result
+      debug:
+        var: join_result.stdout_lines
+      when: join_result.changed
+      
+    # Verify node joined successfully
+    - name: Pause to allow node to register with the cluster
+      pause:
+        seconds: 30
+      when: join_result.changed
+      
+    - name: Display node join status
+      debug:
+        msg: "Node {{ ansible_hostname }} has successfully joined the Kubernetes cluster."
+      when: k8s_joined.stat.exists or join_result.changed

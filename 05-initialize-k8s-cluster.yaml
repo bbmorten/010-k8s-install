@@ -1,0 +1,203 @@
+---
+# Playbook: initialize_k8s_cluster.yml
+# Purpose: Initialize Kubernetes cluster on the control plane node
+# Compatible with Ubuntu 24.04 and Kubernetes 1.32
+
+- name: Initialize Kubernetes cluster on control plane node
+  hosts: control_plane
+  gather_facts: true
+  any_errors_fatal: true
+  
+  vars:
+    pod_network_cidr: "192.168.0.0/16"  # Default for Calico CNI
+    service_cidr: "10.96.0.0/12"       # Kubernetes default
+    kubernetes_version: "1.32.0"       # Can be adjusted as needed
+    control_plane_endpoint: "{{ hostvars[groups['control_plane'][0]]['ansible_host'] }}"
+    apiserver_cert_extra_sans: "{{ hostvars[groups['control_plane'][0]]['ansible_host'] }}"
+    calico_version: "v3.28.0"          # Latest stable Calico version
+    
+  tasks:
+    # Prerequisite checks before cluster initialization
+    - name: Check if Kubernetes is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: k8s_initialized
+      
+    - name: Check if swap is disabled
+      shell: swapon --show
+      register: swap_status
+      changed_when: false
+      
+    - name: Fail if swap is enabled
+      fail:
+        msg: "Swap is still enabled. Please disable swap before initializing the cluster."
+      when: swap_status.stdout != ""
+      
+    - name: Check if containerd is running
+      systemd:
+        name: containerd
+        state: started
+      register: containerd_status
+      check_mode: true
+      failed_when: false
+      changed_when: false
+      
+    - name: Fail if containerd is not running
+      fail:
+        msg: "Containerd is not running. Please ensure containerd is properly installed and running."
+      when: containerd_status.status.ActiveState != "active"
+      
+    - name: Check if required ports are available
+      shell: "netstat -tuln | grep -w {{ item }} || true"
+      loop:
+        - 6443   # kube-apiserver
+        - 10250  # kubelet
+        - 10251  # kube-scheduler
+        - 10252  # kube-controller-manager
+      register: port_check
+      changed_when: false
+      when: not k8s_initialized.stat.exists
+      
+    - name: Identify ports in use
+      set_fact:
+        ports_in_use: "{{ ports_in_use | default([]) + [item.item] }}"
+      loop: "{{ port_check.results | default([]) }}"
+      when: 
+        - not k8s_initialized.stat.exists 
+        - item.stdout != ""
+      
+    - name: Fail if required ports are in use
+      fail:
+        msg: "The following ports are already in use: {{ ports_in_use | join(', ') }}. Please ensure all required ports are available."
+      when: 
+        - not k8s_initialized.stat.exists
+        - ports_in_use is defined and ports_in_use | length > 0
+      
+    # Initialize Kubernetes cluster
+    - name: Pull required container images
+      command: kubeadm config images pull --kubernetes-version {{ kubernetes_version }}
+      when: not k8s_initialized.stat.exists
+      register: pull_images
+      changed_when: "'pulled' in pull_images.stdout"
+      
+    - name: Generate kubeadm init configuration
+      template:
+        src: kubeadm-config.yaml.j2
+        dest: /tmp/kubeadm-config.yaml
+        owner: root
+        group: root
+        mode: '0600'
+      when: not k8s_initialized.stat.exists
+      
+    - name: Initialize Kubernetes cluster with kubeadm
+      command: kubeadm init --config=/tmp/kubeadm-config.yaml --upload-certs
+      register: kubeadm_init
+      when: not k8s_initialized.stat.exists
+      
+    - name: Display kubeadm init output
+      debug:
+        var: kubeadm_init.stdout_lines
+      when: kubeadm_init.changed
+      
+    # Setup kubectl for the Ubuntu user
+    - name: Create .kube directory for Ubuntu user
+      file:
+        path: /home/{{ ansible_user }}/.kube
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      
+    - name: Copy admin.conf to Ubuntu user's .kube directory
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/{{ ansible_user }}/.kube/config
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      
+    # Install Calico CNI networking using manifest with size limitations fix
+    - name: Create directory for Calico manifests
+      file:
+        path: /home/{{ ansible_user }}/calico
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      when: kubeadm_init.changed
+      
+    - name: Download Calico manifest
+      get_url:
+        url: https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml
+        dest: /home/{{ ansible_user }}/calico/calico.yaml
+        mode: '0644'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      when: kubeadm_init.changed
+    
+    - name: Ensure CIDR matches pod_network_cidr
+      replace:
+        path: /home/{{ ansible_user }}/calico/calico.yaml
+        regexp: '192\.168\.0\.0/16'
+        replace: '{{ pod_network_cidr }}'
+      when: kubeadm_init.changed
+      
+    - name: Deploy Calico
+      command: kubectl apply -f /home/{{ ansible_user }}/calico/calico.yaml
+      become: false
+      environment:
+        KUBECONFIG: /home/{{ ansible_user }}/.kube/config
+      when: kubeadm_init.changed
+      
+    - name: Wait for Calico pods to be ready (may take a few minutes)
+      shell: |
+        kubectl wait --for=condition=available --timeout=600s deployment/calico-kube-controllers -n kube-system
+      become: false
+      environment:
+        KUBECONFIG: /home/{{ ansible_user }}/.kube/config
+      register: calico_ready
+      changed_when: false
+      failed_when: false
+      when: kubeadm_init.changed
+      
+    # Verify cluster is operational
+    - name: Wait for control-plane node to be ready
+      command: kubectl wait --for=condition=Ready node/{{ ansible_hostname }} --timeout=300s
+      become: false
+      environment:
+        KUBECONFIG: /home/{{ ansible_user }}/.kube/config
+      register: node_ready
+      changed_when: false
+      when: kubeadm_init.changed
+      
+    - name: Verify all pods are running
+      command: kubectl get pods -A
+      become: false
+      environment:
+        KUBECONFIG: /home/{{ ansible_user }}/.kube/config
+      register: pods_status
+      changed_when: false
+      
+    - name: Display cluster status
+      debug:
+        msg: "Kubernetes cluster is initialized and operational."
+      when: k8s_initialized.stat.exists or kubeadm_init.changed
+      
+    # Generate join command for worker nodes
+    - name: Generate join command for worker nodes
+      command: kubeadm token create --print-join-command
+      register: join_command
+      changed_when: false
+      
+    - name: Store join command
+      copy:
+        content: "{{ join_command.stdout }}"
+        dest: /home/{{ ansible_user }}/k8s_join_command.sh
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0700'
+      
+    - name: Display join command
+      debug:
+        var: join_command.stdout

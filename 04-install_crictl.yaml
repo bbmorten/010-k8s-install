@@ -1,0 +1,103 @@
+---
+# Playbook: install_crictl.yml
+# Purpose: Install crictl (Container Runtime Interface CLI) on Kubernetes nodes
+# Compatible with Ubuntu 24.04 and containerd
+
+- name: Install crictl - CRI command line tool
+  hosts: k8s_cluster
+  gather_facts: true
+  any_errors_fatal: true
+  
+  vars:
+    crictl_version: "v1.29.0"  # Default version as fallback
+  
+  tasks:
+    - name: Get latest crictl version using shell
+      ansible.builtin.shell: |
+        curl -s https://api.github.com/repos/kubernetes-sigs/cri-tools/releases/latest | grep -Po '"tag_name": "\K.*?(?=")'
+      delegate_to: localhost
+      run_once: true
+      become: false
+      register: crictl_version_result
+      changed_when: false
+      
+    - name: Set version fact from API result
+      set_fact:
+        crictl_version: "{{ crictl_version_result.stdout }}"
+      when: crictl_version_result.stdout is defined and crictl_version_result.stdout != ""
+      
+    - name: Display version to be installed
+      debug:
+        msg: "Installing crictl {{ crictl_version }}"
+        
+    - name: Check if crictl is already installed
+      command: which crictl
+      register: crictl_check
+      ignore_errors: true
+      changed_when: false
+      
+    - name: Check installed crictl version
+      command: crictl --version
+      register: crictl_current_version
+      ignore_errors: true
+      changed_when: false
+      when: crictl_check.rc == 0
+      
+    - name: Download crictl
+      get_url:
+        url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictl_version }}/crictl-{{ crictl_version }}-linux-amd64.tar.gz"
+        dest: /tmp/crictl.tar.gz
+        mode: '0644'
+      when: crictl_check.rc != 0 or (crictl_check.rc == 0 and crictl_current_version is defined and crictl_version not in crictl_current_version.stdout)
+      
+    - name: Extract crictl
+      unarchive:
+        src: /tmp/crictl.tar.gz
+        dest: /usr/local/bin/
+        remote_src: yes
+      when: crictl_check.rc != 0 or (crictl_check.rc == 0 and crictl_current_version is defined and crictl_version not in crictl_current_version.stdout)
+      
+    - name: Set crictl configuration
+      copy:
+        dest: /etc/crictl.yaml
+        content: |
+          runtime-endpoint: unix:///run/containerd/containerd.sock
+          image-endpoint: unix:///run/containerd/containerd.sock
+          timeout: 10
+          debug: false
+        mode: '0644'
+      register: crictl_config
+      
+    - name: Check if config file was created
+      stat:
+        path: /etc/crictl.yaml
+      register: config_file
+      
+    - name: Display config file status
+      debug:
+        msg: "Config file exists: {{ config_file.stat.exists }}"
+        
+    - name: Ensure crictl config file is properly set with correct path
+      lineinfile:
+        path: /etc/environment
+        line: 'CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock'
+        regexp: '^CONTAINER_RUNTIME_ENDPOINT='
+        state: present
+      when: config_file.stat.exists
+      
+    - name: Verify crictl installation
+      command: crictl --version
+      register: crictl_version_output
+      changed_when: false
+      ignore_errors: true
+      
+    - name: Display crictl version
+      debug:
+        var: crictl_version_output.stdout
+      when: crictl_version_output is succeeded
+        
+    - name: Cleanup temporary files
+      file:
+        path: /tmp/crictl.tar.gz
+        state: absent
+      changed_when: false
