@@ -11,40 +11,10 @@ sudo apt install ansible-lint
 
 ```
 
-### Generate a ssh-key pair
 
 ```shell
-#mkdir -p /Users/bulent/git-repos-3/ansible-k8s-cluster-on-multipass/playbooks/001-ssh-key-pair/inventory
-cd /Users/bulent/git-repos-3/ansible-k8s-cluster-on-multipass/playbooks/001-ssh-key-pair/inventory
-ssh-keygen -C ubuntu -f multipass-ssh-key
-```
+chmod 600 inventory/multipass-ssh-key
 
-## Step 1 - Create virtual machines (1 Control Plane and 3 nodes)
-
-### Create a cloud-init.yaml
-
-```yaml
-users:
-  - default
-  - name: ubuntu
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    ssh_authorized_keys:
-      - |
-        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGJilzM4pUEiaCAw3CTdc2ikEsNCkeVwLxC+GVcFvlfV ubuntu
-
-```
-
-### Create a bash script
-
-```shell
-#!/bin/bash
-
-# On the HOST
-# Create Multipass Instances
-multipass launch --name control-plane-01 --cpus 2 --memory 4G --disk 20G 24.04 --cloud-init cloud-init.yaml
-multipass launch --name worker-01 --cpus 2 --memory 4G --disk 20G 24.04 --cloud-init cloud-init.yaml 
-multipass launch --name worker-02 --cpus 2 --memory 4G --disk 20G 24.04 --cloud-init cloud-init.yaml
-multipass launch --name worker-03 --cpus 2 --memory 4G --disk 20G 24.04 --cloud-init cloud-init.yaml
 ```
 
 ```shell
@@ -67,15 +37,7 @@ multipass list | awk '{if (NR>1) print $1, $3}'
 
 ```
 
-##  Step 2 - Test the reachability to the hosts
-
--- needs improvement
-
-```shell
-001-ping
-002-uptime
-005-sudo-needed
-```
+Update the nodes.ini file
 
 ##  Step 3 - Taking the snapshots
 
