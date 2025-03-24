@@ -371,7 +371,6 @@
         state: absent
       changed_when: false
 
-# Create kubeadm-config.yaml.j2 template
 - name: Create Kubernetes configuration templates
   hosts: control_plane
   gather_facts: true
@@ -382,56 +381,9 @@
     control_plane_endpoint: "{{ hostvars[groups['control_plane'][0]]['ansible_host'] }}"
     apiserver_cert_extra_sans: "{{ hostvars[groups['control_plane'][0]]['ansible_host'] }}"
   tasks:
-    - name: Create templates directory
-      file:
-        path: "/home/{{ ansible_user }}/templates"
-        state: directory
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: '0755'
-
-    - name: Create kubeadm configuration template
-      copy:
-        dest: "/home/{{ ansible_user }}/templates/kubeadm-config.yaml.j2"
-        content: |
-          ---
-          # kubeadm-config.yaml.j2
-          apiVersion: kubeadm.k8s.io/v1beta3
-          kind: InitConfiguration
-          nodeRegistration:
-            name: {{ ansible_hostname }}
-            criSocket: unix:///run/containerd/containerd.sock
-            taints: []
-          localAPIEndpoint:
-            advertiseAddress: {{ hostvars[groups['control_plane'][0]]['ansible_host'] }}
-            bindPort: 6443
-          ---
-          apiVersion: kubeadm.k8s.io/v1beta3
-          kind: ClusterConfiguration
-          kubernetesVersion: v{{ kubernetes_version }}
-          networking:
-            serviceSubnet: {{ service_cidr }}
-            podSubnet: {{ pod_network_cidr }}
-          controlPlaneEndpoint: "{{ control_plane_endpoint }}:6443"
-          apiServer:
-            certSANs:
-            - "{{ apiserver_cert_extra_sans }}"
-            - "{{ ansible_hostname }}"
-            - "{{ ansible_default_ipv4.address | default(ansible_host) }}"
-            - "127.0.0.1"
-          controllerManager:
-            extraArgs:
-              bind-address: 0.0.0.0
-          scheduler:
-            extraArgs:
-              bind-address: 0.0.0.0
-          ---
-          apiVersion: kubelet.config.k8s.io/v1beta1
-          kind: KubeletConfiguration
-          cgroupDriver: systemd
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        mode: '0644'
+    - name: Skip this play
+      debug:
+        msg: "Skipping template creation - using direct configuration instead"
 
 - name: Initialize Kubernetes cluster on control plane node
   hosts: control_plane
@@ -510,10 +462,45 @@
       register: pull_images
       changed_when: "'pulled' in pull_images.stdout"
       
-    - name: Generate kubeadm init configuration
-      template:
-        src: "/home/{{ ansible_user }}/templates/kubeadm-config.yaml.j2"
+    - name: Create kubeadm config file directly
+      copy:
         dest: /tmp/kubeadm-config.yaml
+        content: |
+          ---
+          # kubeadm-config
+          apiVersion: kubeadm.k8s.io/v1beta3
+          kind: InitConfiguration
+          nodeRegistration:
+            name: {{ ansible_hostname }}
+            criSocket: unix:///run/containerd/containerd.sock
+            taints: []
+          localAPIEndpoint:
+            advertiseAddress: {{ hostvars[groups['control_plane'][0]]['ansible_host'] }}
+            bindPort: 6443
+          ---
+          apiVersion: kubeadm.k8s.io/v1beta3
+          kind: ClusterConfiguration
+          kubernetesVersion: v{{ kubernetes_version }}
+          networking:
+            serviceSubnet: {{ service_cidr }}
+            podSubnet: {{ pod_network_cidr }}
+          controlPlaneEndpoint: "{{ control_plane_endpoint }}:6443"
+          apiServer:
+            certSANs:
+            - "{{ apiserver_cert_extra_sans }}"
+            - "{{ ansible_hostname }}"
+            - "{{ ansible_default_ipv4.address | default(ansible_host) }}"
+            - "127.0.0.1"
+          controllerManager:
+            extraArgs:
+              bind-address: 0.0.0.0
+          scheduler:
+            extraArgs:
+              bind-address: 0.0.0.0
+          ---
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          kind: KubeletConfiguration
+          cgroupDriver: systemd
         owner: root
         group: root
         mode: '0600'
