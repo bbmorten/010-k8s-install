@@ -11,6 +11,10 @@ sudo apt install ansible-lint
 
 ```
 
+```shell
+git clone ...
+
+```
 
 ```shell
 chmod 600 inventory/multipass-ssh-key
@@ -18,26 +22,13 @@ chmod 600 inventory/multipass-ssh-key
 ```
 
 ```shell
-sh ./01-create-multipass-instances.sh
-```
+bash ./01-create-multipass-instances-2.sh
 
-- Check the information on vms
-
-```shell
-bulent@BMAPMB0620 ansible-k8s-cluster-on-multipass % multipass list
-Name                    State             IPv4             Image
-control-plane-01        Running           192.168.64.6     Ubuntu 24.04 LTS
-worker-01               Running           192.168.64.7     Ubuntu 24.04 LTS
-worker-02               Running           192.168.64.8     Ubuntu 24.04 LTS
-worker-03               Running           192.168.64.9     Ubuntu 24.04 LTS
 ```
 
 ```shell
-multipass list | awk '{if (NR>1) print $1, $3}'
-
+bash ./update-nodes-ini.sh inventory/nodes.ini
 ```
-
-Update the nodes.ini file
 
 ##  Step 3 - Taking the snapshots
 
@@ -52,32 +43,11 @@ multipass list --snapshots
 
 ```
 
-##  Step 4 - Configure name resolution
-
-```shell
-cd /home/vm/ansible-k8s-cluster-on-multipass/playbooks/010-k8s-install
-bash ./run.sh 01-name-resolution.yaml --syntax-check
-bash ./run.sh 01-name-resolution.yaml --check
-bash ./run.sh 01-name-resolution.yaml 
-
-```
-
-## Step 5 - System preparation - Update packages and disable swap
-
-```shell
-cd /home/vm/ansible-k8s-cluster-on-multipass/playbooks/010-k8s-install
-bash ./run.sh 02-system-preparation.yaml --syntax-check
-bash ./run.sh 02-system-preparation.yaml --check
-bash ./run.sh 02-system-preparation.yaml 
-
-```
 ## Step 6 - The rest
 
 ```shell
-03-kubernetes_installation.yaml
-04-install_crictl.yaml
-05-initialize-k8s-cluster
-06-join_worker_nodes.yaml
+bash ./run.sh ./consolidated-k8s-installer-2.yaml
+
 ```
 
 ## Step 7 - Calico is not ok
@@ -100,7 +70,6 @@ curl https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/ca
 ```shell
 kubectl apply -f calico.yaml
 ```
-
 
 ```shell
 # Check for Calico pods
