@@ -6,12 +6,12 @@ echo "Project directory that will be mounted: $PROJECT_DIR"
 
 # LXC instance configuration
 LXC_CPUS_CONTROL_PLANE="2"
-LXC_MEMORY_CONTROL_PLANE="8G"
-LXC_DISK_CONTROL_PLANE="20G"
+LXC_MEMORY_CONTROL_PLANE=$((8 * 1024 * 1024 * 1024)) # 8GB in bytes
+LXC_DISK_CONTROL_PLANE="20GB"
 
 LXC_CPUS_WORKER="2"
-LXC_MEMORY_WORKER="4G"
-LXC_DISK_WORKER="20G"
+LXC_MEMORY_WORKER=$((4 * 1024 * 1024 * 1024)) # 4GB in bytes
+LXC_DISK_WORKER="20GB"
 
 # Cloud-init data (same as your cloud-init.yaml)
 CLOUD_INIT_DATA=$(cat <<EOF
@@ -37,7 +37,7 @@ create_lxc_instance() {
   echo "Creating LXC instance: $name"
 
   # Create the LXC container
-  lxc launch ubuntu:24.04 "$name" -c limits.cpu="$cpus" -c limits.memory="$memory" -c limits.disk="$disk"
+  lxc launch ubuntu:24.04 "$name" -c limits.cpu="$cpus" -c limits.memory="$memory" -c size="$disk"
 
   # Configure cloud-init
   lxc file push - <<EOF "$name/etc/cloud/cloud.cfg.d/90_custom.cfg"
