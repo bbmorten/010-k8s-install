@@ -182,7 +182,7 @@ To remove and reapply Calico on your Kubernetes cluster, follow these steps:
 
 ```bash
 # First, remove all Calico resources
-kubectl delete -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+kubectl delete -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.2/manifests/calico.yaml
 ```
 
 This command will delete all Calico components including the DaemonSets, Deployments, ConfigMaps, and CRDs. Wait until all Calico resources are removed before proceeding.
