@@ -36,8 +36,8 @@ create_lxc_instance() {
 
   echo "Creating LXC instance: $name"
 
-  # Create the LXC container
-  lxc launch ubuntu:24.04 "$name" -c limits.cpu="$cpus" -c limits.memory="$memory" -c size="$disk"
+  # Create the LXC container with disk size specified
+  lxc launch ubuntu:24.04 "$name" -c limits.cpu="$cpus" -c limits.memory="$memory" -s "$disk"
 
   # Configure cloud-init
   lxc file push - <<EOF "$name/etc/cloud/cloud.cfg.d/90_custom.cfg"
