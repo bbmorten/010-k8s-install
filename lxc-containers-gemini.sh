@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Halucinated not working 
 # Project directory to mount (if needed, only for control-plane)
 PROJECT_DIR=$(pwd)
 echo "Project directory that will be mounted: $PROJECT_DIR"
