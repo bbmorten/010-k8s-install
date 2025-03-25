@@ -7,6 +7,9 @@
 ```shell title='HOST'
 sudo apt update && apt upgrade -y
 sudo snap install multipass
+sudo snap install lxd
+lxd init --auto
+multipass set local.driver=lxd
 sudo apt install ansible-core
 sudo apt install ansible-lint
 
@@ -166,7 +169,7 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
 
 If all components show as running and the tests pass, your Kubernetes cluster is properly configured and operational across all nodes!
 
-## Appendix
+## Appendix 1
 
 ### Delete the cluster
 
@@ -271,3 +274,77 @@ multipass set local.control-plane-01.memory=8G
 multipass start control-plane-01
 multipass info control-plane-01
 ```
+
+##  Appendix 2
+
+When running a Kubernetes cluster on a QEMU-based host, you need to consider factors like nested virtualization overhead, resource efficiency, and the level of isolation required. Here’s a breakdown of your options:
+
+### Multipass Instance (Default QEMU Backend)
+
+- **What it is:**  
+  Multipass using its default QEMU backend launches full virtual machines with their own kernel.
+- **Pros:**  
+  - Provides strong isolation since each instance is a full VM.
+- **Cons:**  
+  - On a QEMU host, you’re likely to run into nested virtualization. This can lead to performance penalties and additional resource overhead.
+  - Boot times are longer compared to container-based solutions.
+
+### LXD Containers
+
+- **What they are:**  
+  LXD containers share the host kernel using lightweight OS-level virtualization.
+- **Pros:**  
+  - Much lower overhead and faster startup since there’s no need to boot a full OS.
+  - Ideal for development or testing clusters because they’re resource-efficient.
+- **Cons:**  
+  - Since containers share the host kernel, isolation isn’t as complete as with full VMs. This is usually acceptable for development, but might not be ideal in some production scenarios.
+
+### Multipass with LXC (LXD) Driver
+
+- **What it is:**  
+  Multipass can be configured (with `multipass set local.driver=lxd`) to use LXD as its backend. This gives you the convenience of Multipass’s interface while provisioning LXD containers.
+- **Pros:**  
+  - Combines the ease-of-use of Multipass with the efficiency of LXD containers.
+  - Avoids nested virtualization, making it a great fit for your QEMU environment.
+- **Cons:**  
+  - Essentially the same as using LXD directly, so if you need full VM isolation, this isn’t the option.
+
+### QEMU Instances Directly
+
+- **What it is:**  
+  Launching full QEMU virtual machines outside of Multipass.
+- **Pros:**  
+  - Full isolation and customization of the VM environment.
+- **Cons:**  
+  - If your host is already a QEMU VM, you’d be nesting VMs, which can significantly degrade performance.
+  - More complex management compared to Multipass or LXD.
+
+### Other Options
+
+- **Kubernetes-in-Docker (kind) or Lightweight Distributions (k3s, microk8s):**  
+  - These tools are designed specifically for running Kubernetes clusters in development environments.
+  - **Pros:**  
+    - They’re optimized for local testing, have minimal overhead, and are easy to set up.
+  - **Cons:**  
+    - They may not closely mimic a production environment if that is a requirement.
+  
+- **Bare Metal or Dedicated VMs (if possible):**  
+  - For production-level isolation and performance, running Kubernetes on dedicated hardware or full VMs (outside of nested virtualization) is preferred. However, this might not be feasible if you’re already constrained to a QEMU-based setup.
+
+### Which Is Better for Your QEMU Host?
+
+Given that you’re running on a QEMU VM:
+
+- **Avoiding Nested Virtualization:**  
+  Using Multipass with its default QEMU backend or standalone QEMU instances can introduce nested virtualization overhead. This can lead to degraded performance and potential issues with resource management.
+  
+- **Efficiency and Speed:**  
+  **LXD containers (or Multipass with the LXD driver)** are generally a better choice in this scenario. They are lightweight, start quickly, and avoid the complications of nested virtualization. This is especially useful for a Kubernetes cluster where you might be running several nodes that need to communicate efficiently.
+  
+- **Use Case Considerations:**  
+  - **Development/Testing:** LXD containers (or Multipass with the LXD driver) are ideal for quickly spinning up a multi-node Kubernetes cluster for development or testing.
+  - **Production Simulation:** If you need to mimic a production environment more closely (with full VM isolation), you might lean toward full VMs. However, doing so on a QEMU host can be challenging due to the nested virtualization overhead.
+
+### Final Recommendation
+
+For a Kubernetes cluster running on a QEMU host where performance and ease-of-use are priorities, **using LXD containers or Multipass configured with the LXD (LXC) driver** is generally the best approach. This method minimizes overhead by avoiding nested virtualization while providing sufficient isolation and resource control for development or test clusters.
