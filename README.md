@@ -5,6 +5,7 @@
 ###  Installing ansible-core on the host
 
 ```shell title='HOST'
+sudo apt update && apt upgrade -y
 sudo apt install ansible-core
 sudo apt install ansible-lint
 
@@ -64,32 +65,11 @@ bash ./run.sh ./consolidated-k8s-installer-3.yaml
 
 ```
 
-### If Calico is not ok
-
-- Not required after the third version of the yaml. But for your information I'm keeping it here.
-
-### Download the Calico manifest
+##  Step 4 - Testing the cluster
 
 ```shell title='HOST'
-curl https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml -O
-
-# Optional: If you used a non-default pod CIDR, edit the manifest
-# Find and replace 192.168.0.0/16 with your pod network CIDR
-# nano calico.yaml
-
-
-### Apply the manifest
-
-
-kubectl apply -f calico.yaml
+multipass shell control-plane-01
 ```
-
-```shell
-# Check for Calico pods
-kubectl get pods -n kube-system -l k8s-app=calico-node
-```
-
-##  Step 4 - Testing the cluster
 
 ```shell title='control-plane-01'
 # Watch the nodes becoming ready
@@ -104,8 +84,13 @@ sudo systemctl status kubelet
 kubectl describe nodes control-plane-01 | grep -A10 Conditions
 ```
 
-###  Kubernetes cluster Test Deployment
+###  Step 5 - Take another snapshot after successfull cluster installation
 
+```shell
+bash ./snapshot.sh k8s-install-completed
+```
+
+###  Step 6 - Kubernetes cluster Test Deployment
 
 I've created a comprehensive test deployment to verify your Kubernetes cluster is working properly. This YAML file contains multiple resources that will help you confirm all components are functioning correctly across your control plane and worker nodes.
 
@@ -180,9 +165,48 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
 
 If all components show as running and the tests pass, your Kubernetes cluster is properly configured and operational across all nodes!
 
-## Step 5 -  Delete the cluster
+
+## Appendix
+
+### Delete the cluster
 
 ```shell
 multipass delete control-plane-01 worker-01 worker-02 worker-03 --purge
 
+```
+
+### If Calico is not ok (optional/obsolote)
+
+- Not required after the third version of the yaml. But for your information I'm keeping it here.
+
+#### Download the Calico manifest
+
+```shell title='HOST'
+curl https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml -O
+
+# Optional: If you used a non-default pod CIDR, edit the manifest
+# Find and replace 192.168.0.0/16 with your pod network CIDR
+# nano calico.yaml
+
+
+### Apply the manifest
+
+
+kubectl apply -f calico.yaml
+```
+
+```shell
+# Check for Calico pods
+kubectl get pods -n kube-system -l k8s-app=calico-node
+```
+
+### Extend the memory of an instance if necessary
+
+
+
+```shell
+multipass stop control-plane-01
+multipass set local.control-plane-01.memory=8G
+multipass start control-plane-01
+multipass info control-plane-01
 ```

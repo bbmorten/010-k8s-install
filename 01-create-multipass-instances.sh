@@ -6,7 +6,7 @@ echo "Project directory that will be mounted: $PROJECT_DIR"
 
 # Create Multipass Instances
 echo "Creating control plane node with mounted project directory..."
-multipass launch --name control-plane-01 --cpus 2 --memory 4G --disk 20G 24.04 --cloud-init cloud-init.yaml --mount "$PROJECT_DIR":/home/ubuntu/k8s-project
+multipass launch --name control-plane-01 --cpus 2 --memory 8G --disk 20G 24.04 --cloud-init cloud-init.yaml --mount "$PROJECT_DIR":/home/ubuntu/k8s-project
 
 echo "Creating worker nodes..."
 multipass launch --name worker-01 --cpus 2 --memory 4G --disk 20G 24.04 --cloud-init cloud-init.yaml 
