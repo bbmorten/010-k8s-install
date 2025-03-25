@@ -432,10 +432,10 @@
   vars:
     pod_network_cidr: "192.168.0.0/16"  # Default for Calico CNI
     service_cidr: "10.96.0.0/12"       # Kubernetes default
-    kubernetes_version: "1.32.0"       # Can be adjusted as needed
+    kubernetes_version: "1.32.2"       # Can be adjusted as needed
     control_plane_endpoint: "{{ hostvars[groups['control_plane'][0]]['ansible_host'] }}"
     apiserver_cert_extra_sans: "{{ hostvars[groups['control_plane'][0]]['ansible_host'] }}"
-    calico_version: "v3.28.0"          # Latest stable Calico version
+    calico_version: "v3.29.2"          # Latest stable Calico version
     
   tasks:
     # Prerequisite checks before cluster initialization

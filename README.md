@@ -165,7 +165,6 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
 
 If all components show as running and the tests pass, your Kubernetes cluster is properly configured and operational across all nodes!
 
-
 ## Appendix
 
 ### Delete the cluster
@@ -177,32 +176,93 @@ multipass delete control-plane-01 worker-01 worker-02 worker-03 --purge
 
 ### If Calico is not ok (optional/obsolote)
 
-- Not required after the third version of the yaml. But for your information I'm keeping it here.
+To remove and reapply Calico on your Kubernetes cluster, follow these steps:
 
-#### Download the Calico manifest
+### Step 1: Delete the existing Calico installation
 
-```shell title='HOST'
-curl https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml -O
+```bash
+# First, remove all Calico resources
+kubectl delete -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
+```
 
-# Optional: If you used a non-default pod CIDR, edit the manifest
-# Find and replace 192.168.0.0/16 with your pod network CIDR
-# nano calico.yaml
+This command will delete all Calico components including the DaemonSets, Deployments, ConfigMaps, and CRDs. Wait until all Calico resources are removed before proceeding.
 
+### Step 2: Make sure all related pods are terminated
 
-### Apply the manifest
+```bash
+# Check if all calico pods are terminated
+kubectl get pods -n kube-system | grep calico
+```
 
+If any pods remain in "Terminating" state for a long time, you may need to force delete them:
 
+```bash
+kubectl delete pod -n kube-system <pod-name> --grace-period=0 --force
+```
+
+### Step 3: Clean up CNI configuration on all nodes
+
+SSH into each node (control plane and workers) and run:
+
+```bash
+# Remove CNI configuration files
+sudo rm -rf /etc/cni/net.d/*
+
+# Restart kubelet
+sudo systemctl restart kubelet
+```
+
+### Step 4: Reinstall Calico
+
+Download and customize the Calico manifest if needed:
+
+```bash
+# Download the manifest
+curl https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml -O
+
+# Edit the manifest if you need to change settings
+# For example, if you need to modify the Pod CIDR
+# Modify the CALICO_IPV4POOL_CIDR value in the manifest
+nano calico.yaml
+```
+
+Then apply the manifest:
+
+```bash
 kubectl apply -f calico.yaml
 ```
 
-```shell
-# Check for Calico pods
-kubectl get pods -n kube-system -l k8s-app=calico-node
+### Step 5: Verify the installation
+
+```bash
+# Check if Calico pods are running
+kubectl get pods -n kube-system | grep calico
+
+# Check nodes status
+kubectl get nodes
 ```
 
+### Step 6: Validate network connectivity
+
+You can run a simple test deployment to verify that the pod network is functioning:
+
+```bash
+# Create a test deployment
+kubectl create deployment nginx --image=nginx
+
+# Expose it as a service
+kubectl expose deployment nginx --port=80
+
+# Create a test pod to access the service
+kubectl run busybox --image=busybox:1.28 -- sleep 3600
+
+# Test connectivity from the busybox pod
+kubectl exec -it busybox -- wget -qO- nginx
+```
+
+If the reinstallation of Calico doesn't resolve your issues, you might need to look more deeply at your specific cluster configuration, such as pod CIDR ranges, node networking, or potential conflicts with your host network.
+
 ### Extend the memory of an instance if necessary
-
-
 
 ```shell
 multipass stop control-plane-01
