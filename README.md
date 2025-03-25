@@ -82,3 +82,12 @@ kubectl get nodes -w
 kubectl get pods -n kube-system
 sudo systemctl status kubelet
 kubectl describe nodes control-plane-01 | grep -A10 Conditions
+
+
+
+kubectl apply -f k8s-cluster-test.yaml
+kubectl get all -n k8s-test
+
+
+ubuntu@control-plane-01:~$ kubeadm token create --print-join-command
+kubeadm join 10.14.96.37:6443 --token q5tban.yqa9sw6im3d2z2fg --discovery-token-ca-cert-hash sha256:d7498807d0145b5e30c427682a029d4fdd97fe304b7012837f85b1141fca5bfc
