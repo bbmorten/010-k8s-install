@@ -6,6 +6,7 @@
 
 ```shell title='HOST'
 sudo apt update && apt upgrade -y
+sudo snap install multipass
 sudo apt install ansible-core
 sudo apt install ansible-lint
 
