@@ -115,16 +115,16 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
     sleep 10
     kubectl apply -f 02-main-resources.yaml
 
-    ```
+  ```
 
-    ```shell
+  ```shell
     # Wait for the main resources to be created
     sleep 10
     # Step 3: Apply all
     kubectl apply -f 03-node-viewer.yaml
 
 
-    ```
+  ```
   
 3. Check that all resources are created properly:
 
