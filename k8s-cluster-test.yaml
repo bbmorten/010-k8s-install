@@ -22,67 +22,6 @@ data:
     This is a test ConfigMap to verify the Kubernetes API is working properly.
     Timestamp: $(date)
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nginx-test
-  namespace: k8s-test
-  labels:
-    app: nginx-test
-spec:
-  replicas: 4  # One pod per node (assuming 1 control plane + 3 workers)
-  selector:
-    matchLabels:
-      app: nginx-test
-  template:
-    metadata:
-      labels:
-        app: nginx-test
-    spec:
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - nginx-test
-              topologyKey: "kubernetes.io/hostname"
-      containers:
-      - name: nginx
-        image: nginx:stable
-        ports:
-        - containerPort: 80
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 200m
-            memory: 256Mi
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        volumeMounts:
-        - name: nginx-index
-          mountPath: /usr/share/nginx/html
-      volumes:
-      - name: nginx-index
-        configMap:
-          name: nginx-index
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -120,14 +59,116 @@ data:
         <p class="success">✅ If you can see this page, your Kubernetes deployment is working!</p>
         <p>Pod information:</p>
         <ul>
-          <li>Pod Name: <b>HOSTNAME</b></li>
-          <li>Node: <b>NODE_NAME</b></li>
-          <li>Pod IP: <b>POD_IP</b></li>
-          <li>Service Account: <b>SERVICE_ACCOUNT</b></li>
+          <li>Pod Name: <b>${HOSTNAME}</b></li>
+          <li>Node: <b>${NODE_NAME}</b></li>
+          <li>Pod IP: <b>${POD_IP}</b></li>
+          <li>Service Account: <b>${SERVICE_ACCOUNT}</b></li>
         </ul>
       </div>
     </body>
     </html>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: entrypoint-script
+  namespace: k8s-test
+data:
+  entrypoint.sh: |
+    #!/bin/sh
+    set -e
+    
+    # Generate the HTML with environment variables substituted
+    envsubst < /tmp/index-template.html > /usr/share/nginx/html/index.html
+    
+    # Start nginx in the foreground
+    exec nginx -g 'daemon off;'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-test
+  namespace: k8s-test
+  labels:
+    app: nginx-test
+spec:
+  replicas: 4  # One pod per node (assuming 1 control plane + 3 workers)
+  selector:
+    matchLabels:
+      app: nginx-test
+  template:
+    metadata:
+      labels:
+        app: nginx-test
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - nginx-test
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: nginx
+        image: nginx:stable
+        command: ["/bin/sh", "/scripts/entrypoint.sh"]
+        ports:
+        - containerPort: 80
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: nginx-index
+          mountPath: /tmp/index-template.html
+          subPath: index.html
+        - name: scripts
+          mountPath: /scripts
+      volumes:
+      - name: nginx-index
+        configMap:
+          name: nginx-index
+      - name: scripts
+        configMap:
+          name: entrypoint-script
+          defaultMode: 0755
 ---
 apiVersion: v1
 kind: Service
