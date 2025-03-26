@@ -262,11 +262,15 @@ kind: ServiceAccount
 metadata:
   name: node-viewer-sa
   namespace: k8s-test
+  labels:
+    app: k8s-test-rbac
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: node-viewer-role
+  labels:
+    app: k8s-test-rbac
 rules:
 - apiGroups: [""]
   resources: ["nodes"]
@@ -279,6 +283,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: node-viewer-role-binding
+  labels:
+    app: k8s-test-rbac
 subjects:
 - kind: ServiceAccount
   name: node-viewer-sa
