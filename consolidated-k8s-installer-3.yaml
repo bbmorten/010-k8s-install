@@ -317,12 +317,12 @@
   any_errors_fatal: true
   
   vars:
-    crictl_version: "v1.29.0"  # Default version as fallback
+    crictl_version: "v1.32.0"  # Default version as fallback
   
   tasks:
     - name: Get latest crictl version using shell
       ansible.builtin.shell: |
-        curl -s https://api.github.com/repos/kubernetes-sigs/cri-tools/releases/latest | grep -Po '"tag_name": "\K.*?(?=")'
+        curl -s https://api.github.com/repos/kubernetes-sigs/cri-tools/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/'
       delegate_to: localhost
       run_once: true
       become: false

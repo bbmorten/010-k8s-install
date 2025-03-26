@@ -56,7 +56,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export ANSIBLE_CONFIG="${SCRIPT_DIR}/ansible.cfg"
 
 # Base Ansible command with the provided playbook file
-ansible_command="ansible-playbook -b $playbook_file "
+ansible_command="ansible-playbook -b -K $playbook_file "
 
 # Add options based on flags
 if [ "$syntax_check" = true ]; then
