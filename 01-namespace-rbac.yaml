@@ -1,0 +1,38 @@
+---
+# First create the namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k8s-test
+---
+# Then create the RBAC resources
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-viewer-sa
+  namespace: k8s-test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-viewer-role
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-viewer-role-binding
+subjects:
+- kind: ServiceAccount
+  name: node-viewer-sa
+  namespace: k8s-test
+roleRef:
+  kind: ClusterRole
+  name: node-viewer-role
+  apiGroup: rbac.authorization.k8s.io

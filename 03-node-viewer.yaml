@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-viewer
+  namespace: k8s-test
+spec:
+  containers:
+  - name: node-viewer
+    image: bitnami/kubectl:latest
+    command: ["/bin/sh", "-c"]
+    args:
+    - |
+      echo "===== Kubernetes Cluster Node Status ====="
+      kubectl get nodes -o wide
+      
+      echo "\\n===== Pod distribution across nodes ====="
+      kubectl get pods -n k8s-test -o wide
+      
+      echo "\\n===== Control Plane Component Status ====="
+      kubectl get pods -n kube-system
+      
+      echo "\\nWaiting for manual inspection (press Ctrl+C to exit)..."
+      sleep 3600
+  serviceAccountName: node-viewer-sa

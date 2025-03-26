@@ -104,22 +104,27 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
 
 2. Apply it to your cluster from the control plane node:
 
-```shell
+  ```shell
 
    # Step 1: First apply just the RBAC resources
-    kubectl apply -f k8s-cluster-test.yaml -l app=k8s-test-rbac
-```
+    kubectl apply -f 01-namespace-rbac.yaml
+  ```
 
-```shell
+  ```shell
     # Step 2: Wait a moment for the resources to be properly created
-    sleep 3
-```
+    sleep 10
+    kubectl apply -f 02-main-resources.yaml
 
-```shell
-    # Step 3: Apply the full manifest
-    kubectl apply -fk8s-cluster-test.yaml
+    ```
 
-```
+    ```shell
+    # Wait for the main resources to be created
+    sleep 10
+    # Step 3: Apply all
+    kubectl apply -f 03-node-viewer.yaml
+
+
+    ```
   
 3. Check that all resources are created properly:
 
