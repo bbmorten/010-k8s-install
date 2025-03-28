@@ -1,5 +1,5 @@
 #!/bin/bash
-# NFS Server Setup Script for IP 192.168.49.19
+# NFS Server Setup Script for IP 192.168.48.19
 
 # Install NFS server packages
 echo "Installing NFS server packages..."
