@@ -17,12 +17,12 @@
       delegate_to: localhost
   
   tasks:
-    - name: Disable cloud-init manage_etc_hosts
-      lineinfile:
-        path: /etc/cloud/cloud.cfg
-        regexp: '^manage_etc_hosts:'
-        line: 'manage_etc_hosts: false'
-        state: present
+#    - name: Disable cloud-init manage_etc_hosts
+#      lineinfile:
+#        path: /etc/cloud/cloud.cfg
+#        regexp: '^manage_etc_hosts:'
+#        line: 'manage_etc_hosts: false'
+#        state: present
       
     - name: Backup original /etc/hosts file
       copy:
