@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-secured
+  annotations:
+    container.apparmor.security.beta.kubernetes.io/nginx: localhost/nginx-profile
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      ports:
+        - containerPort: 80

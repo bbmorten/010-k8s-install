@@ -1,0 +1,35 @@
+- name: AppArmor + Security Profiles Operator Setup
+  hosts: all
+  become: true
+  tasks:
+    - name: Ensure AppArmor is installed and enabled
+      apt:
+        name:
+          - apparmor
+          - apparmor-utils
+        state: present
+        update_cache: yes
+
+    - name: Enable and start AppArmor
+      systemd:
+        name: apparmor
+        enabled: yes
+        state: started
+
+    - name: Create AppArmor profile for nginx
+      copy:
+        dest: /etc/apparmor.d/k8s-nginx
+        content: |
+          #include <tunables/global>
+          profile k8s-nginx flags=(attach_disconnected) {
+            file,
+            network,
+            capability,
+            deny /bin/su mr,
+            deny /usr/bin/wget mr,
+            /usr/sbin/nginx rix,
+            /var/www/** r,
+          }
+
+    - name: Load AppArmor profile
+      command: apparmor_parser -r /etc/apparmor.d/k8s-nginx
