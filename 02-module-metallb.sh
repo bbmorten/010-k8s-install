@@ -60,7 +60,7 @@ EOF
 echo "Checking if test service got an IP from MetalLB..."
 kubectl get service test-service
 
-echo "MetalLB has been installed and configured with IP range 192.168.48.50-60"
+echo "MetalLB has been installed and configured with IP range 192.168.48.135-140"
 echo "To use it with your existing ingress controller, change the service type to LoadBalancer:"
 echo "kubectl patch svc nginx-ingress-ingress-nginx-controller -n ingress-nginx -p '{\"spec\":{\"type\":\"LoadBalancer\"}}'"
 
