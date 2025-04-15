@@ -1,3 +1,4 @@
+# config.toml part is not good.
 ---
 - name: Install nerdctl and setup registry on control plane
   hosts: control_plane
