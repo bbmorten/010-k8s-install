@@ -61,6 +61,12 @@
   vars:
     registry_host: "{{ hostvars[groups['control_plane'][0]]['ansible_host'] }}:5000"
     timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+  handlers:
+    - name: restart containerd
+      systemd:
+        name: containerd
+        state: restarted
+        daemon_reload: yes
   tasks:
     - name: Check if containerd config exists
       stat:
@@ -85,23 +91,61 @@
         dest: /etc/containerd/config.toml
       when: not containerd_config.stat.exists
 
-    - name: Configure insecure registry
-      blockinfile:
-        path: /etc/containerd/config.toml
-        backup: yes
-        marker: "# {mark} ANSIBLE MANAGED BLOCK FOR INSECURE REGISTRY"
-        block: |
-          [plugins."io.containerd.grpc.v1.cri".registry]
-            [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
-              [plugins."io.containerd.grpc.v1.cri".registry.mirrors."{{ registry_host }}"]
-                endpoint = ["http://{{ registry_host }}"]
-            [plugins."io.containerd.grpc.v1.cri".registry.configs]
-              [plugins."io.containerd.grpc.v1.cri".registry.configs."{{ registry_host }}"]
-                [plugins."io.containerd.grpc.v1.cri".registry.configs."{{ registry_host }}".tls]
-                  insecure_skip_verify = true
+    - name: Check current containerd configuration
+      command: cat /etc/containerd/config.toml
+      register: containerd_config_content
+      changed_when: false
+      
+    - name: Create a temporary file with current config
+      copy:
+        content: "{{ containerd_config_content.stdout }}"
+        dest: "/tmp/containerd_config.toml.{{ timestamp }}"
+      
+    - name: Configure insecure registry - safer approach
+      shell: |
+        cat > /tmp/registry_config.toml << 'EOF'
+        version = 2
 
-    - name: Restart containerd service
-      systemd:
-        name: containerd
-        state: restarted
-        daemon_reload: yes
+        [plugins."io.containerd.grpc.v1.cri".registry]
+          [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+            [plugins."io.containerd.grpc.v1.cri".registry.mirrors."{{ registry_host }}"]
+              endpoint = ["http://{{ registry_host }}"]
+          [plugins."io.containerd.grpc.v1.cri".registry.configs]
+            [plugins."io.containerd.grpc.v1.cri".registry.configs."{{ registry_host }}"]
+              [plugins."io.containerd.grpc.v1.cri".registry.configs."{{ registry_host }}".tls]
+                insecure_skip_verify = true
+        EOF
+        
+        containerd config default > /etc/containerd/config.toml.new
+        sed -i 's/\[plugins."io.containerd.grpc.v1.cri".registry\]//' /etc/containerd/config.toml.new
+        cat /tmp/registry_config.toml >> /etc/containerd/config.toml.new
+        mv /etc/containerd/config.toml.new /etc/containerd/config.toml
+
+    - name: Validate the configuration before applying
+      command: containerd config validate /etc/containerd/config.toml
+      register: validate_result
+      failed_when: false
+      changed_when: false
+      
+    - name: Debug validation result
+      debug:
+        msg: "Config validation output: {{ validate_result.stdout | default('') }} {{ validate_result.stderr | default('') }}"
+      
+    - name: Apply configuration if valid
+      command: echo "Configuration is valid, applying changes"
+      when: validate_result.rc == 0
+      notify: restart containerd
+      
+    - name: Revert to backup if validation failed
+      block:
+        - name: Restore previous configuration
+          copy:
+            src: "/etc/containerd/config.toml.{{ timestamp }}"
+            dest: /etc/containerd/config.toml
+            remote_src: yes
+          when: validate_result.rc != 0 and containerd_config.stat.exists
+          
+        - name: Alert about validation failure
+          debug:
+            msg: "Configuration validation failed. Reverted to backup. Please check the containerd configuration format."
+          when: validate_result.rc != 0
