@@ -68,8 +68,16 @@ sudo apt-get update
 
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+---
+
 sudo apt install --no-install-recommends qemu-system libvirt-clients libvirt-daemon-system
 adduser vm libvirt
+
+containerd config default | sudo tee /etc/containerd/config.toml
+sudo systemctl restart containerd
+
+sudo usermod -aG docker $USER && newgrp docker
+
 
 minikube start --nodes 2
 
