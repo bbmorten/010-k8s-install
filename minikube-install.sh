@@ -226,3 +226,21 @@ kubectl delete pod web
 kubectl delete service web
 kubectl delete networkpolicy web-deny-all
 
+
+# Accessing minikube installation
+
+rm -rf .remote-minikube
+REMOTE_MACHINE=192.168.48.134
+MINIKUBE_IP=$(ssh vm@$REMOTE_MACHINE minikube ip)
+#MINIKUBE_PORT=$(ssh vm@$REMOTE_MACHINE kubectl get svc -n kube-system -o jsonpath='{.items[0].spec.ports[0].nodePort}')
+MINIKUBE_PORT=8443
+mkdir -p .remote-minikube/profile-$REMOTE_MACHINE
+cd .remote-minikube/profile-$REMOTE_MACHINE
+scp vm@$REMOTE_MACHINE:/home/vm/.minikube/profiles/minikube/client.crt .
+scp vm@$REMOTE_MACHINE:/home/vm/.minikube/profiles/minikube/client.key .
+scp vm@$REMOTE_MACHINE:/home/vm/.minikube/ca.crt .
+scp vm@$REMOTE_MACHINE:/home/vm/.kube/config .
+
+ssh -L 12346:$MINIKUBE_IP:$MINIKUBE_PORT vm@$REMOTE_MACHINE
+# Change the context in the config file to point to the remote machine and update the server address to 127.0.0.1:12346
+# Change the file paths to ~/.remote-minikube/profile-$REMOTE_MACHINE
