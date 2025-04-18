@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-pod
+spec:
+  containers:
+    - name: web-container
+      image: nginxinc/nginx-unprivileged
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+

@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: no-escalation-pod
+spec:
+  containers:
+    - name: alpine
+      image: alpine:latest
+      command: ["sleep", "3600"]
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: escalation-allowed-pod
+spec:
+  containers:
+    - name: alpine
+      image: alpine:latest
+      command: ["sleep", "3600"]
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        allowPrivilegeEscalation: true
