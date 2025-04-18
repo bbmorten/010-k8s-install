@@ -18,3 +18,22 @@ spec:
       image: nginx
       securityContext:
         privileged: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-pod
+  namespace: secure-namespace
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  containers:
+    - name: web-container
+      image: nginxinc/nginx-unprivileged
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
