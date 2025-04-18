@@ -45,3 +45,10 @@ ping: permission denied (are you root?)
 PING 8.8.8.8 (8.8.8.8): 56 data bytes
 command terminated with exit code 1
 ```
+
+## pod-security-admission-policies.yaml
+
+```shell
+kubectl describe pod insecure-pod -n secure-namespace
+
+```

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: secure-namespace
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: insecure-pod
+  namespace: secure-namespace
+spec:
+  containers:
+    - name: web-container
+      image: nginx
+      securityContext:
+        privileged: true
