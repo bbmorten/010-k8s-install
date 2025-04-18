@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: run-as-non-root-pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+    - name: busybox
+      image: busybox
+      command: ["sleep", "3600"]
+      securityContext:
+        runAsUser: 1000
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: run-as-non-root-failure
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+    - name: busybox
+      image: busybox
+      command: ["sleep", "3600"]
+      securityContext:
+        runAsUser: 0
