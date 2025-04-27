@@ -7,15 +7,23 @@
   become: true  # This ensures the tasks run with elevated privileges
   gather_facts: true
   vars:
-    config_file: "{{ config_file }}"  # Pass this as an extra var with -e
+    config_file: "{{ config_file | default('') }}"  # Handle undefined variable more gracefully
     timestamp: "{{ ansible_date_time.iso8601_basic_short }}"  # Format: YYYYMMDDTHHMMSS
     backup_path: "/etc/containerd/config.toml.{{ timestamp }}"
   
   tasks:
-    - name: Check if config_file variable is defined
-      fail:
-        msg: "Please provide the path to the config file using -e 'config_file=/path/to/your/config.toml'"
-      when: config_file is not defined or config_file == ""
+    - name: Prompt for config file if not provided
+      pause:
+        prompt: "Please enter the full path to your containerd config file"
+      register: config_file_prompt
+      when: not config_file
+      delegate_to: localhost
+      become: false
+
+    - name: Set config file path from prompt if needed
+      set_fact:
+        config_file: "{{ config_file_prompt.user_input | default(config_file) }}"
+      when: not config_file
 
     - name: Check if the config file exists locally
       stat:
