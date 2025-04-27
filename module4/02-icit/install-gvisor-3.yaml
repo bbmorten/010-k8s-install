@@ -1,0 +1,62 @@
+---
+- name: Check and Install gVisor via Official Repository
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check if CPU supports user namespaces (required by gVisor)
+      ansible.builtin.command: sysctl kernel.unprivileged_userns_clone
+      register: userns_clone
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if user namespaces not enabled
+      ansible.builtin.fail:
+        msg: "System not compatible with gVisor: 'kernel.unprivileged_userns_clone' is not enabled."
+      when: userns_clone.stdout.find("= 1") == -1
+
+    - name: Install required dependencies
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Add gVisor GPG key (only if not exists)
+      ansible.builtin.shell: |
+        curl -fsSL https://gvisor.dev/archive.key | gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/gvisor-archive-keyring.gpg
+
+    - name: Add gVisor repository (EXACT echo + tee method)
+      ansible.builtin.shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | tee /etc/apt/sources.list.d/gvisor.list > /dev/null
+      args:
+        creates: /etc/apt/sources.list.d/gvisor.list
+
+    - name: Update apt package lists
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install runsc from gVisor repository
+      ansible.builtin.apt:
+        name: runsc
+        state: present
+
+    - name: Remove old /usr/local/bin/runsc if exists (priority cleanup)
+      ansible.builtin.file:
+        path: /usr/local/bin/runsc
+        state: absent
+
+    - name: Verify correct runsc installation
+      ansible.builtin.command: runsc --version
+      register: runsc_version
+      changed_when: false
+
+    - name: Show installed gVisor runsc version
+      ansible.builtin.debug:
+        msg: "gVisor installed successfully with runsc version: {{ runsc_version.stdout }}"
