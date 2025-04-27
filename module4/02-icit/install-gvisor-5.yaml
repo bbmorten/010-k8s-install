@@ -32,7 +32,13 @@
 
     # Step 3: Add the gVisor repository
     - name: Add gVisor repository
-      shell: echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | tee /etc/apt/sources.list.d/gvisor.list > /dev/null
+      shell: |
+        # Ensure we use amd64 architecture for x86_64 systems
+        if [ "$(uname -m)" = "x86_64" ]; then
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | tee /etc/apt/sources.list.d/gvisor.list > /dev/null
+        else
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | tee /etc/apt/sources.list.d/gvisor.list > /dev/null
+        fi
       args:
         creates: /etc/apt/sources.list.d/gvisor.list
 
