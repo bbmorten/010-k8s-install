@@ -1,0 +1,99 @@
+---
+- name: Install Latest gVisor via Official Repository
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Check if CPU supports user namespaces (required by gVisor)
+      ansible.builtin.command: sysctl kernel.unprivileged_userns_clone
+      register: userns_clone
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if user namespaces not enabled
+      ansible.builtin.fail:
+        msg: "System not compatible with gVisor: 'kernel.unprivileged_userns_clone' is not enabled."
+      when: userns_clone.stdout.find("= 1") == -1
+
+    - name: Install required dependencies
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - gpg
+        state: present
+        update_cache: true
+
+    - name: Add gVisor GPG key
+      ansible.builtin.get_url:
+        url: https://gvisor.dev/archive.key
+        dest: /tmp/gvisor.key
+        mode: '0644'
+
+    - name: Import GPG key
+      ansible.builtin.shell: cat /tmp/gvisor.key | gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/gvisor-archive-keyring.gpg
+
+    - name: Add gVisor repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ ansible_architecture }} signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main"
+        state: present
+        filename: gvisor
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Check latest available runsc version
+      ansible.builtin.shell: apt-cache madison runsc | head -1 | awk '{print $3}'
+      register: latest_runsc_version
+      changed_when: false
+
+    - name: Remove old installed runsc (if any)
+      ansible.builtin.apt:
+        name: runsc
+        state: absent
+      ignore_errors: true
+
+    - name: Install latest runsc version
+      ansible.builtin.apt:
+        name: runsc={{ latest_runsc_version.stdout }}
+        state: present
+        force: yes
+
+    - name: Install containerd-shim-runsc-v1
+      ansible.builtin.apt:
+        name: containerd-shim-runsc-v1
+        state: present
+      ignore_errors: true
+
+    - name: Verify runsc installation
+      ansible.builtin.command: runsc --version
+      register: runsc_version
+      changed_when: false
+
+    - name: Show installed gVisor runsc version
+      ansible.builtin.debug:
+        msg: "gVisor installed successfully with runsc version: {{ runsc_version.stdout }}"
+
+    - name: Enable runsc in containerd (if containerd exists)
+      ansible.builtin.blockinfile:
+        path: /etc/containerd/config.toml
+        block: |
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+            runtime_type = "io.containerd.runsc.v1"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - GVISOR RUNSC RUNTIME"
+        create: yes
+        backup: yes
+      register: containerd_config
+      ignore_errors: true
+
+    - name: Restart containerd service (if it exists)
+      ansible.builtin.service:
+        name: containerd
+        state: restarted
+      when: containerd_config is success
+      ignore_errors: true
