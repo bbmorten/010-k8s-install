@@ -1,0 +1,64 @@
+---
+- name: Check and Install gVisor
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+
+  vars:
+    gvisor_release_url: "https://storage.googleapis.com/gvisor/releases/release/latest"
+    gvisor_download_path: "/usr/local/bin/runsc"
+    gvisor_shim_path: "/usr/local/bin/containerd-shim-runsc-v1"
+
+  tasks:
+    - name: Check if CPU supports user namespaces (required by gVisor)
+      ansible.builtin.command: sysctl kernel.unprivileged_userns_clone
+      register: userns_clone
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if user namespaces not enabled
+      ansible.builtin.fail:
+        msg: "System not compatible with gVisor: 'kernel.unprivileged_userns_clone' is not enabled."
+      when: userns_clone.stdout.find("= 1") == -1
+
+    - name: Install dependencies (curl, tar) if missing
+      ansible.builtin.package:
+        name:
+          - curl
+          - tar
+        state: present
+
+    - name: Download latest gVisor runsc release
+      ansible.builtin.get_url:
+        url: "{{ gvisor_release_url }}/runsc"
+        dest: "{{ gvisor_download_path }}"
+        mode: '0755'
+      register: runsc_download
+
+    - name: Download latest gVisor containerd shim release
+      ansible.builtin.get_url:
+        url: "{{ gvisor_release_url }}/containerd-shim-runsc-v1"
+        dest: "{{ gvisor_shim_path }}"
+        mode: '0755'
+      register: shim_download
+
+    - name: Ensure runsc is executable
+      ansible.builtin.file:
+        path: "{{ gvisor_download_path }}"
+        mode: '0755'
+        state: file
+
+    - name: Ensure containerd-shim-runsc-v1 is executable
+      ansible.builtin.file:
+        path: "{{ gvisor_shim_path }}"
+        mode: '0755'
+        state: file
+
+    - name: Verify gVisor installation - runsc version
+      ansible.builtin.command: "{{ gvisor_download_path }} --version"
+      register: runsc_version
+      changed_when: false
+
+    - name: Print gVisor version
+      ansible.builtin.debug:
+        msg: "gVisor installed successfully: {{ runsc_version.stdout }}"
