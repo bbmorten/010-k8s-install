@@ -1,6 +1,7 @@
 ---
 # deploy-containerd-config.yml
 # Usage: ansible-playbook deploy-containerd-config.yml -e "config_file=/path/to/your/config.toml"
+# ansible-playbook -b -K common/deploy-containerd-config.yaml -e "config_file=/home/vm/010-k8s-install/common/config-48-31.toml"
 
 - name: Deploy containerd config to all hosts
   hosts: all
