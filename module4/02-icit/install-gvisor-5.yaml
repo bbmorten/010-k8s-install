@@ -1,0 +1,85 @@
+---
+- name: Install gVisor via Official Repository
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Check if CPU supports user namespaces (required by gVisor)
+      shell: sysctl kernel.unprivileged_userns_clone
+      register: userns_clone
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if user namespaces not enabled
+      fail:
+        msg: "System not compatible with gVisor: 'kernel.unprivileged_userns_clone' is not enabled."
+      when: userns_clone.stdout.find("= 1") == -1
+
+    # Step 1: Install required dependencies
+    - name: Update package lists
+      shell: apt-get update
+      changed_when: false
+
+    - name: Install required dependencies
+      shell: apt-get install -y apt-transport-https ca-certificates curl gnupg
+      changed_when: true
+
+    # Step 2: Add the gVisor GPG key
+    - name: Add gVisor GPG key
+      shell: curl -fsSL https://gvisor.dev/archive.key | gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/gvisor-archive-keyring.gpg
+
+    # Step 3: Add the gVisor repository
+    - name: Add gVisor repository
+      shell: echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | tee /etc/apt/sources.list.d/gvisor.list > /dev/null
+      args:
+        creates: /etc/apt/sources.list.d/gvisor.list
+
+    # Step 4: Update package lists
+    - name: Update package lists after adding repository
+      shell: apt-get update
+      changed_when: false
+
+    # Step 5: Install runsc
+    - name: Remove any previously installed runsc
+      shell: apt-get remove -y runsc || true
+      changed_when: false
+
+    - name: Install runsc
+      shell: apt-get install -y runsc
+      changed_when: true
+
+    # Verify installation
+    - name: Verify runsc installation
+      shell: runsc --version
+      register: runsc_version
+      changed_when: false
+
+    - name: Show installed gVisor runsc version
+      debug:
+        msg: "gVisor installed successfully with runsc version: {{ runsc_version.stdout }}"
+
+    # Configure containerd (if it exists)
+    - name: Check if containerd config exists
+      shell: test -f /etc/containerd/config.toml && echo "exists" || echo "not_exists"
+      register: containerd_config_exists
+      changed_when: false
+
+    - name: Configure containerd to use runsc (if containerd exists)
+      shell: |
+        if ! grep -q "runsc" /etc/containerd/config.toml; then
+          cat << EOF >> /etc/containerd/config.toml
+        
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+          runtime_type = "io.containerd.runsc.v1"
+        EOF
+        fi
+      when: containerd_config_exists.stdout == "exists"
+      register: containerd_config_updated
+      changed_when: containerd_config_updated.rc == 0
+
+    - name: Restart containerd (if it exists and was updated)
+      shell: systemctl restart containerd
+      when: containerd_config_exists.stdout == "exists" and containerd_config_updated.changed
+      ignore_errors: true
