@@ -38,16 +38,24 @@
       args:
         creates: /etc/apt/sources.list.d/gvisor.list
 
-    - name: Update apt package lists
+    - name: Force update apt cache
       ansible.builtin.apt:
         update_cache: yes
+        cache_valid_time: 0
 
-    - name: Install runsc from gVisor repository
+    - name: Remove old installed runsc (if any)
       ansible.builtin.apt:
         name: runsc
-        state: present
+        state: absent
+      ignore_errors: true
 
-    - name: Remove old /usr/local/bin/runsc if exists (priority cleanup)
+    - name: Install correct runsc version from gVisor repo
+      ansible.builtin.shell: |
+        apt-get install -y --allow-downgrades runsc
+      args:
+        executable: /bin/bash
+
+    - name: Remove old /usr/local/bin/runsc if exists
       ansible.builtin.file:
         path: /usr/local/bin/runsc
         state: absent
