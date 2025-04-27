@@ -48,11 +48,16 @@
         name: runsc
         state: present
 
-    - name: Verify runsc installation
-      ansible.builtin.command: runsc --version
+    - name: Remove old runsc binary from /usr/local/bin if exists
+      ansible.builtin.file:
+        path: /usr/local/bin/runsc
+        state: absent
+
+    - name: Verify correct runsc version is available
+      ansible.builtin.command: /usr/bin/runsc --version
       register: runsc_version
       changed_when: false
 
-    - name: Print runsc version
+    - name: Print correct runsc version
       ansible.builtin.debug:
-        msg: "gVisor installed successfully: {{ runsc_version.stdout }}"
+        msg: "gVisor installed successfully and using: {{ runsc_version.stdout }}"
