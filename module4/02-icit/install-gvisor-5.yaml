@@ -1,3 +1,5 @@
+#  Failed in installating the latest runsc version
+#  and containerd-shim-runsc-v1
 ---
 - name: Install gVisor via Official Repository
   hosts: k8s_cluster
