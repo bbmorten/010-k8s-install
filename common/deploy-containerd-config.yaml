@@ -1,0 +1,128 @@
+---
+# deploy-containerd-config.yml
+# Usage: ansible-playbook deploy-containerd-config.yml -e "config_file=/path/to/your/config.toml"
+
+- name: Deploy containerd config to all hosts
+  hosts: all
+  become: true  # This ensures the tasks run with elevated privileges
+  gather_facts: true
+  vars:
+    config_file: "{{ config_file }}"  # Pass this as an extra var with -e
+    timestamp: "{{ ansible_date_time.iso8601_basic_short }}"  # Format: YYYYMMDDTHHMMSS
+    backup_path: "/etc/containerd/config.toml.{{ timestamp }}"
+  
+  tasks:
+    - name: Check if config_file variable is defined
+      fail:
+        msg: "Please provide the path to the config file using -e 'config_file=/path/to/your/config.toml'"
+      when: config_file is not defined or config_file == ""
+
+    - name: Check if the config file exists locally
+      stat:
+        path: "{{ config_file }}"
+      delegate_to: localhost
+      register: config_file_stat
+      become: false
+
+    - name: Fail if config file does not exist
+      fail:
+        msg: "The specified config file does not exist: {{ config_file }}"
+      when: not config_file_stat.stat.exists
+
+    - name: Check if containerd config directory exists
+      stat:
+        path: /etc/containerd
+      register: containerd_dir
+
+    - name: Create containerd config directory if it doesn't exist
+      file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'
+      when: not containerd_dir.stat.exists
+
+    - name: Check if original config file exists
+      stat:
+        path: /etc/containerd/config.toml
+      register: original_config
+
+    - name: Backup existing config file with timestamp
+      copy:
+        src: /etc/containerd/config.toml
+        dest: "{{ backup_path }}"
+        remote_src: yes
+        mode: preserve
+      when: original_config.stat.exists
+
+    - name: Copy new config file to all hosts
+      copy:
+        src: "{{ config_file }}"
+        dest: /etc/containerd/config.toml
+        mode: '0644'
+      register: config_copied
+
+    - name: Check if containerd service exists
+      command: systemctl status containerd
+      register: containerd_status
+      failed_when: false
+      changed_when: false
+
+    - name: Check if kubelet service exists
+      command: systemctl status kubelet
+      register: kubelet_status
+      failed_when: false
+      changed_when: false
+
+    - name: Restart containerd service if it exists
+      systemd:
+        name: containerd
+        state: restarted
+      register: containerd_restart
+      when: 
+        - config_copied.changed
+        - containerd_status.rc == 0
+
+    - name: Wait for containerd to fully start
+      pause:
+        seconds: 5
+      when: containerd_restart is changed
+
+    - name: Restart kubelet service if it exists
+      systemd:
+        name: kubelet
+        state: restarted
+      register: kubelet_restart
+      when: 
+        - config_copied.changed
+        - kubelet_status.rc == 0
+
+    - name: Check containerd service status after restart
+      command: systemctl status containerd
+      register: containerd_status_after
+      failed_when: false
+      changed_when: false
+      when: containerd_restart is changed
+
+    - name: Check kubelet service status after restart
+      command: systemctl status kubelet
+      register: kubelet_status_after
+      failed_when: false
+      changed_when: false
+      when: kubelet_restart is changed
+
+    - name: Report service status after restart
+      debug:
+        msg: |
+          Service status after restart:
+          - containerd: {% if containerd_restart is changed %}{% if containerd_status_after.rc == 0 %}Running{% else %}Failed{% endif %}{% else %}Not restarted{% endif %}
+          - kubelet: {% if kubelet_restart is changed %}{% if kubelet_status_after.rc == 0 %}Running{% else %}Failed{% endif %}{% else %}Not restarted{% endif %}
+
+    - name: Report successful deployment
+      debug:
+        msg: |
+          Containerd config deployed to {{ inventory_hostname }}
+          {% if original_config.stat.exists %}
+          Original config backed up to: {{ backup_path }}
+          {% else %}
+          No previous config found to backup.
+          {% endif %}
