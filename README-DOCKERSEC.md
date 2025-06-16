@@ -26,16 +26,10 @@ chmod 600 inventory/multipass-ssh-key
 
 ```
 
-- Create the virtual machines control-plane-01, worker-01, worker-02, worker-03
-  
-```shell title='HOST'
-bash ./01-create-multipass-instances.sh
-```
-
-- Check the status of the virtual machines. If it is ok continue with updating the inventory for the ansible script
+- Edit inventory/nodes.ini file. Hostnames and ip addresses will be corrected.
 
 ```shell title='HOST'
-bash ./update-nodes-ini.sh inventory/nodes.ini
+vi inventory/nodes.ini
 ```
 
 - Do àpt update && apt upgrade -y on all virtual machines
@@ -45,16 +39,10 @@ bash ./run.sh apt-update-upgrade.yaml
 
 ```
 
-##  Step 2 - Taking the snapshots before cluster installation
+## Step 2 - Delete cluster installation
 
-```shell
-bash ./snapshot.sh k8s-pre-install
-```
-
-### (Optional) Verify the snapshots
-
-```shell
-multipass list --snapshots
+```shell title='HOST'
+bash ./run.sh ./delete-cluster-v1.yaml
 
 ```
 
