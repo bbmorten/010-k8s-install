@@ -46,11 +46,10 @@ bash ./run.sh ./delete-cluster-v1.yaml
 
 ```
 
-## Step 3 - Start cluster installation
+## Step 3 - Start docker installation
 
 ```shell title='HOST'
-bash ./run.sh ./consolidated-k8s-installer-3.yaml
-
+bash ./run.sh common/deploy-docker-config.yaml
 ```
 
 ##  Step 4 - Testing the cluster

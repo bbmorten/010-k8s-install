@@ -44,11 +44,14 @@
         state: directory
         mode: '0755'
 
-    - name: Download Docker GPG key
+    - name: Download Docker GPG key (binary)
       ansible.builtin.get_url:
         url: "{{ docker_apt_key_url }}"
         dest: /etc/apt/keyrings/docker.gpg
         mode: '0644'
+      args:
+        headers:
+          Accept: application/octet-stream
 
     - name: Add Docker repository
       apt_repository:
