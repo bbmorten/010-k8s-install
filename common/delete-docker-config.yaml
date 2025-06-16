@@ -1,0 +1,77 @@
+---
+# delete-docker-config.yaml
+# Usage: ansible-playbook delete-docker-config.yaml
+# Removes Docker Engine and related configuration from Ubuntu hosts
+
+- name: Remove Docker Engine from Ubuntu
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    docker_packages:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    docker_config_file: /etc/docker/daemon.json
+    docker_repo_file: /etc/apt/sources.list.d/docker.list
+    docker_gpg_key: /etc/apt/keyrings/docker.gpg
+
+  tasks:
+    - name: Stop Docker service
+      systemd:
+        name: docker
+        state: stopped
+      ignore_errors: true
+
+    - name: Remove Docker packages
+      apt:
+        name: "{{ docker_packages }}"
+        state: absent
+        purge: yes
+        autoremove: yes
+      ignore_errors: true
+
+    - name: Remove Docker config file
+      file:
+        path: "{{ docker_config_file }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Remove Docker config directory if empty
+      file:
+        path: /etc/docker
+        state: absent
+      ignore_errors: true
+
+    - name: Remove Docker GPG key
+      file:
+        path: "{{ docker_gpg_key }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Remove Docker apt repository
+      file:
+        path: /etc/apt/sources.list.d/docker.list
+        state: absent
+      ignore_errors: true
+
+    - name: Update apt cache after removal
+      apt:
+        update_cache: yes
+      ignore_errors: true
+
+    - name: Remove user from docker group (optional)
+      user:
+        name: "{{ ansible_user | default('ubuntu') }}"
+        groups: docker
+        append: no
+        state: present
+      when: ansible_user is defined
+      ignore_errors: true
+
+    - name: Report Docker removal status
+      debug:
+        msg: "Docker Engine and related configuration have been removed from {{ inventory_hostname }}."
