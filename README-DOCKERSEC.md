@@ -52,10 +52,18 @@ bash ./run.sh ./delete-cluster-v1.yaml
 bash ./run.sh common/deploy-docker-config.yaml
 ```
 
-##  Step 4 - Testing the cluster
+```shell title='ALTERNATIVE-HOST'
+sudo bash common/install-docker.sh 
+sudo groupadd docker
+sudo usermod -aG docker $USER
+```
+
+- Logout and login again
+
+##  Step 4 - Testing the installation
 
 ```shell title='HOST'
-multipass shell control-plane-01
+docker run hello-world
 ```
 
 ```shell title='control-plane-01'

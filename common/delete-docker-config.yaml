@@ -15,9 +15,13 @@
       - containerd.io
       - docker-buildx-plugin
       - docker-compose-plugin
+      - docker-ce-rootless-extras
+      - docker-compose
+      - docker
     docker_config_file: /etc/docker/daemon.json
     docker_repo_file: /etc/apt/sources.list.d/docker.list
     docker_gpg_key: /etc/apt/keyrings/docker.gpg
+    docker_install_script_path: /tmp/install-docker.sh
 
   tasks:
     - name: Stop Docker service
@@ -55,6 +59,12 @@
     - name: Remove Docker apt repository
       file:
         path: /etc/apt/sources.list.d/docker.list
+        state: absent
+      ignore_errors: true
+
+    - name: Remove Docker install script
+      file:
+        path: "{{ docker_install_script_path }}"
         state: absent
       ignore_errors: true
 
