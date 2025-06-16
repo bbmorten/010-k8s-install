@@ -53,7 +53,8 @@ bash ./run.sh common/deploy-docker-config.yaml
 ```
 
 ```shell title='ALTERNATIVE-HOST'
-sudo bash common/install-docker.sh 
+# https://get.docker.com
+# sudo bash install-docker.sh 
 sudo groupadd docker
 sudo usermod -aG docker $USER
 ```
