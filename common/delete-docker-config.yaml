@@ -68,11 +68,6 @@
         state: absent
       ignore_errors: true
 
-    - name: Update apt cache after removal
-      apt:
-        update_cache: yes
-      ignore_errors: true
-
     - name: Remove user from docker group (optional)
       user:
         name: "{{ ansible_user | default('ubuntu') }}"
@@ -80,6 +75,17 @@
         append: no
         state: present
       when: ansible_user is defined
+      ignore_errors: true
+
+    - name: Remove docker group
+      group:
+        name: docker
+        state: absent
+      ignore_errors: true
+
+    - name: Update apt cache after removal
+      apt:
+        update_cache: yes
       ignore_errors: true
 
     - name: Report Docker removal status

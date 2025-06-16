@@ -33,6 +33,18 @@
       args:
         creates: /usr/bin/docker
 
+    - name: Ensure docker group exists
+      group:
+        name: docker
+        state: present
+
+    - name: Add current user to docker group (optional)
+      user:
+        name: "{{ ansible_user | default('ubuntu') }}"
+        groups: docker
+        append: yes
+      when: ansible_user is defined
+
     - name: Ensure Docker service is started and enabled
       systemd:
         name: docker
@@ -51,13 +63,6 @@
         content: "{{ docker_config_content }}"
         mode: '0644'
       notify: Restart Docker
-
-    - name: Add current user to docker group (optional)
-      user:
-        name: "{{ ansible_user | default('ubuntu') }}"
-        groups: docker
-        append: yes
-      when: ansible_user is defined
 
   handlers:
     - name: Restart Docker
