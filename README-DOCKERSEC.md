@@ -6,10 +6,6 @@
 
 ```shell title='HOST'
 sudo apt update && sudo apt upgrade -y
-sudo snap install multipass
-sudo snap install lxd
-lxd init --auto
-multipass set local.driver=lxd
 sudo apt install ansible-core
 sudo apt install ansible-lint
 
