@@ -68,12 +68,9 @@
         state: absent
       ignore_errors: true
 
-    - name: Remove user from docker group (optional)
-      user:
-        name: "{{ ansible_user | default('ubuntu') }}"
-        groups: docker
-        append: no
-        state: present
+    - name: Remove user from docker group (safe)
+      shell: |
+        gpasswd -d {{ ansible_user | default('ubuntu') }} docker || true
       when: ansible_user is defined
       ignore_errors: true
 
@@ -81,6 +78,15 @@
       group:
         name: docker
         state: absent
+      ignore_errors: true
+
+    - name: Ensure user is in sudo group (restore sudo privileges)
+      user:
+        name: "{{ ansible_user | default('ubuntu') }}"
+        groups: sudo
+        append: yes
+        state: present
+      when: ansible_user is defined
       ignore_errors: true
 
     - name: Update apt cache after removal
