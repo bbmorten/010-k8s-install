@@ -47,7 +47,7 @@ bash ./01-create-multipass-instances.sh
 bash ./update-nodes-ini.sh inventory/nodes.ini
 ```
 
-- Do àpt update && apt upgrade -y on all virtual machines
+- Do apt update && apt upgrade -y on all virtual machines
 
 ```shell title='HOST'
 bash ./run.sh apt-update-upgrade.yaml
