@@ -1,8 +1,9 @@
-# K8S Cluster Installation 
+# K8S Cluster Installation with Ansible from MAC Host Usimf
 
 ##  Step 1 - Clone the repository for supplementals
 
 ```shell title='HOST'
+cd ~/git-repos/cilium-study
 git clone https://github.com/bbmorten/010-k8s-install.git
 ```
 
@@ -10,14 +11,11 @@ git clone https://github.com/bbmorten/010-k8s-install.git
 
 ```shell title='HOST'
 cd 010-k8s-install/
-chmod 600 inventory/multipass-ssh-key
-
 ```
 
-- (Optional) Create new key pair if you're using multipass. And use ubuntu instead of vm for username in inventory/nodes.ini
+```shell title='HOST'
+chmod 600 inventory/multipass-ssh-key
 
-```shell
-ssh-keygen -t ed25519 -f inventory/multipass-ssh-key -N '' -C 'multipass cloud-init key'
 ```
 
 - Create the phyton environment for ansible
@@ -31,20 +29,6 @@ source .venv/bin/activate
 
 # Install Ansible Core and Ansible Lint inside the virtual environment
 uv pip install ansible ansible-core ansible-lint
-# I'm not sure
-ansible-galaxy collection install community.general
-```
-
-- Create the virtual machines control-plane-01, worker-01, worker-02, worker-03
-  
-```shell title='HOST'
-bash ./01-create-multipass-instances.sh
-```
-
-- Check the status of the virtual machines. If it is ok continue with updating the inventory for the ansible script
-
-```shell title='HOST'
-bash ./update-nodes-ini.sh inventory/nodes.ini
 ```
 
 - Do apt update && apt upgrade -y on all virtual machines
@@ -54,16 +38,10 @@ bash ./run.sh apt-update-upgrade.yaml
 
 ```
 
-##  Step 2 - Taking the snapshots before cluster installation
+## Step 2 - Delete cluster installation (if exists)
 
-```shell
-bash ./snapshot.sh k8s-pre-install
-```
-
-### (Optional) Verify the snapshots
-
-```shell
-multipass list --snapshots
+```shell title='HOST'
+bash ./run.sh ./delete-cluster-v2.yaml
 
 ```
 
