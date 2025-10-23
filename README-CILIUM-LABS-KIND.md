@@ -54,9 +54,9 @@ cilium install
 cilium status --wait
 ```
 
+```shell
 cilium hubble enable --ui
-
-
+```
 
 ```bash
 cilium connectivity test --request-timeout 30s --connect-timeout 10s
