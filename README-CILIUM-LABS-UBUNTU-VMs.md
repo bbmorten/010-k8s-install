@@ -4,7 +4,7 @@
 
 ```shell title='HOST'
 cd ~/git-repos/cilium-study
-git clone https://github.com/bbmorten/010-k8s-install.git
+git clone https://github.com/bbmorten/010-k8s-install.git -b cilium-lab-installation
 ```
 
 - Correct the permissions for the private-key
@@ -87,28 +87,28 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
 
 2. Apply it to your cluster from the control plane node:
 
-  ```shell
+```shell
 
-   # Step 1: First apply just the RBAC resources
-    kubectl apply -f 01-namespace-rbac.yaml
-  ```
+ # Step 1: First apply just the RBAC resources
+  kubectl apply -f 01-namespace-rbac.yaml
+```
 
-  ```shell
-    # Step 2: Wait a moment for the resources to be properly created
-    sleep 10
-    kubectl apply -f 02-main-resources.yaml
+```shell
+  # Step 2: Wait a moment for the resources to be properly created
+  sleep 10
+  kubectl apply -f 02-main-resources.yaml
 
-  ```
+```
 
-  ```shell
-    # Wait for the main resources to be created
-    sleep 10
-    # Step 3: Apply all
-    kubectl apply -f 03-node-viewer.yaml
+```shell
+  # Wait for the main resources to be created
+  sleep 10
+  # Step 3: Apply all
+  kubectl apply -f 03-node-viewer.yaml
 
 
-  ```
-  
+```
+
 3. Check that all resources are created properly:
 
    ```bash
@@ -120,6 +120,7 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
 1. **Namespace**: Creates a dedicated `k8s-test` namespace to isolate test resources
 
 2. **NGINX Deployment**:
+
    - Creates 4 replica pods (one for each node in your cluster)
    - Uses pod anti-affinity to spread pods across different nodes
    - Includes health checks and resource limits
@@ -129,6 +130,7 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
 4. **ConfigMap**: Creates a custom HTML page showing pod details
 
 5. **Test Job**: Runs a series of tests to check:
+
    - DNS resolution
    - API server connectivity
    - Network connectivity between pods
@@ -163,7 +165,7 @@ I've created a comprehensive test deployment to verify your Kubernetes cluster i
    ```bash
    # Get the NodePort assigned to the service
    NODE_PORT=$(kubectl get svc -n k8s-test nginx-test -o jsonpath='{.spec.ports[0].nodePort}')
-   
+
    # Access from any node
    curl http://<any-node-ip>:$NODE_PORT
    ```
@@ -284,9 +286,9 @@ When running a Kubernetes cluster on a QEMU-based host, you need to consider fac
 
 - **What it is:**  
   Multipass using its default QEMU backend launches full virtual machines with their own kernel.
-- **Pros:**  
+- **Pros:**
   - Provides strong isolation since each instance is a full VM.
-- **Cons:**  
+- **Cons:**
   - On a QEMU host, you’re likely to run into nested virtualization. This can lead to performance penalties and additional resource overhead.
   - Boot times are longer compared to container-based solutions.
 
@@ -294,42 +296,41 @@ When running a Kubernetes cluster on a QEMU-based host, you need to consider fac
 
 - **What they are:**  
   LXD containers share the host kernel using lightweight OS-level virtualization.
-- **Pros:**  
+- **Pros:**
   - Much lower overhead and faster startup since there’s no need to boot a full OS.
   - Ideal for development or testing clusters because they’re resource-efficient.
-- **Cons:**  
+- **Cons:**
   - Since containers share the host kernel, isolation isn’t as complete as with full VMs. This is usually acceptable for development, but might not be ideal in some production scenarios.
 
 ### Multipass with LXC (LXD) Driver
 
 - **What it is:**  
   Multipass can be configured (with `multipass set local.driver=lxd`) to use LXD as its backend. This gives you the convenience of Multipass’s interface while provisioning LXD containers.
-- **Pros:**  
+- **Pros:**
   - Combines the ease-of-use of Multipass with the efficiency of LXD containers.
   - Avoids nested virtualization, making it a great fit for your QEMU environment.
-- **Cons:**  
+- **Cons:**
   - Essentially the same as using LXD directly, so if you need full VM isolation, this isn’t the option.
 
 ### QEMU Instances Directly
 
 - **What it is:**  
   Launching full QEMU virtual machines outside of Multipass.
-- **Pros:**  
+- **Pros:**
   - Full isolation and customization of the VM environment.
-- **Cons:**  
+- **Cons:**
   - If your host is already a QEMU VM, you’d be nesting VMs, which can significantly degrade performance.
   - More complex management compared to Multipass or LXD.
 
 ### Other Options
 
-- **Kubernetes-in-Docker (kind) or Lightweight Distributions (k3s, microk8s):**  
+- **Kubernetes-in-Docker (kind) or Lightweight Distributions (k3s, microk8s):**
   - These tools are designed specifically for running Kubernetes clusters in development environments.
-  - **Pros:**  
+  - **Pros:**
     - They’re optimized for local testing, have minimal overhead, and are easy to set up.
-  - **Cons:**  
+  - **Cons:**
     - They may not closely mimic a production environment if that is a requirement.
-  
-- **Bare Metal or Dedicated VMs (if possible):**  
+- **Bare Metal or Dedicated VMs (if possible):**
   - For production-level isolation and performance, running Kubernetes on dedicated hardware or full VMs (outside of nested virtualization) is preferred. However, this might not be feasible if you’re already constrained to a QEMU-based setup.
 
 ### Which Is Better for Your QEMU Host?
@@ -338,14 +339,219 @@ Given that you’re running on a QEMU VM:
 
 - **Avoiding Nested Virtualization:**  
   Using Multipass with its default QEMU backend or standalone QEMU instances can introduce nested virtualization overhead. This can lead to degraded performance and potential issues with resource management.
-  
 - **Efficiency and Speed:**  
   **LXD containers (or Multipass with the LXD driver)** are generally a better choice in this scenario. They are lightweight, start quickly, and avoid the complications of nested virtualization. This is especially useful for a Kubernetes cluster where you might be running several nodes that need to communicate efficiently.
-  
-- **Use Case Considerations:**  
+- **Use Case Considerations:**
   - **Development/Testing:** LXD containers (or Multipass with the LXD driver) are ideal for quickly spinning up a multi-node Kubernetes cluster for development or testing.
   - **Production Simulation:** If you need to mimic a production environment more closely (with full VM isolation), you might lean toward full VMs. However, doing so on a QEMU host can be challenging due to the nested virtualization overhead.
 
 ### Final Recommendation
 
 For a Kubernetes cluster running on a QEMU host where performance and ease-of-use are priorities, **using LXD containers or Multipass configured with the LXD (LXC) driver** is generally the best approach. This method minimizes overhead by avoiding nested virtualization while providing sufficient isolation and resource control for development or test clusters.
+
+##  Cilium Installation
+
+- Install the Cilium CLI
+
+```shell
+CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+CLI_ARCH=amd64
+if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+```
+
+- Install Cilium
+
+```shell
+cilium install
+```
+
+- Validate Cilium Operation
+
+```shell
+cilium connectivity test --request-timeout 30s --connect-timeout 10s
+
+```
+
+```shell
+# Multiple custom targets (Quad9 + OpenDNS)
+cilium connectivity test \
+  --external-target dns.google
+  --external-ip 146.112.61.106
+
+  --request-timeout 30s --connect-timeout 10s
+```
+
+- Hand-on with L4 and L7 Network Policy
+
+```shell
+kubectl create -f https://raw.githubusercontent.com/cilium/cilium/HEAD/examples/minikube/http-sw-app.yaml
+```
+
+```shell
+kubectl get services
+kubectl get pods,CiliumEndpoints
+
+```
+
+```shell
+kubectl exec xwing -- curl -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+```
+
+The Death Star service is up and running, time to implement network policy and limit access to it from just the pods we want.
+
+```shell
+vm@ST-10-01:~$ kubectl exec xwing -- curl -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+Ship landed
+```
+
+```shell
+vm@ST-10-01:~$ kubectl exec tiefighter -- curl -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+Ship landed
+```
+
+- Empire Ingress Allow Policy
+
+```shell
+vm@ST-10-01:~$ kubectl describe pod/xwing
+Name:             xwing
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             st-10-03/192.168.48.133
+Start Time:       Tue, 11 Nov 2025 12:49:03 +0000
+Labels:           app.kubernetes.io/name=xwing
+                  class=xwing
+                  org=alliance
+```
+
+```shell
+vm@ST-10-01:~$ kubectl describe pod/tiefighter
+Name:             tiefighter
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             st-10-04/192.168.48.134
+Start Time:       Tue, 11 Nov 2025 12:49:03 +0000
+Labels:           app.kubernetes.io/name=tiefighter
+                  class=tiefighter
+                  org=empire
+```
+
+```yaml title='Allow Empire In'
+mkdir yamls
+cd yamls
+cat > allow-empire-in-namespace.yaml << EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-empire-in-namespace
+spec:
+  podSelector:
+    matchLabels:
+      org: empire
+      class: deathstar
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              org: empire
+      ports:
+        - port: 80
+          protocol: TCP
+EOF
+```
+
+```shell
+kubectl apply -f allow-empire-in-namespace.yaml
+
+```
+
+```shell
+vm@ST-10-01:~/yamls$ kubectl apply -f allow-empire-in-namespace.yaml
+networkpolicy.networking.k8s.io/allow-empire-in-namespace created
+
+vm@ST-10-01:~/yamls$ kubectl exec xwing -- curl --connect-timeout 10 -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+command terminated with exit code 28
+
+vm@ST-10-01:~/yamls$ kubectl exec tiefighter -- curl --connect-timeout 10 -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+Ship landed
+vm@ST-10-01:~/yamls$
+```
+
+```shell
+vm@ST-10-01:~/yamls$ kubectl exec tiefighter -- curl -s -XPUT deathstar.default.svc.cluster.local/v1/exhaust-port
+Panic: deathstar exploded
+
+goroutine 1 [running]:
+main.HandleGarbage(0x2080c3f50, 0x2, 0x4, 0x425c0, 0x5, 0xa)
+        /code/src/github.com/empire/deathstar/
+        temp/main.go:9 +0x64
+main.main()
+        /code/src/github.com/empire/deathstar/
+        temp/main.go:5 +0x85
+```
+
+```yaml
+cat > allow-empire-in-namespace-cilium.yaml << EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-empire-in-namespace
+spec:
+  endpointSelector:
+    matchLabels:
+      org: empire
+      class: deathstar
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        org: empire
+        class: tiefighter
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      rules:
+        http:
+        - method: "POST"
+          path: "/v1/request-landing"
+  - fromEndpoints:
+    - matchLabels:
+        org: empire
+        class: maintenance-droid
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      rules:
+        http:
+        - method: "PUT"
+          path: "/v1/exhaust-port"
+EOF
+```
+
+```shell
+vm@ST-10-01:~/yamls$ kubectl apply -f allow-empire-in-namespace-cilium.yaml
+ciliumnetworkpolicy.cilium.io/allow-empire-in-namespace created
+```
+
+## Hubble Installation
+
+```shell
+HUBBLE_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/hubble/master/stable.txt)
+HUBBLE_ARCH=amd64
+if [ "$(uname -m)" = "aarch64" ]; then HUBBLE_ARCH=arm64; fi
+curl -L --fail --remote-name-all https://github.com/cilium/hubble/releases/download/$HUBBLE_VERSION/hubble-linux-${HUBBLE_ARCH}.tar.gz{,.sha256sum}
+sha256sum --check hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum
+sudo tar xzvfC hubble-linux-${HUBBLE_ARCH}.tar.gz /usr/local/bin
+rm hubble-linux-${HUBBLE_ARCH}.tar.gz{,.sha256sum}
+
+```
+
+```shell
+cilium hubble port-forward
+```
