@@ -49,17 +49,21 @@ Note: inventory hostnames (`st-10-01..04`) intentionally differ from Multipass V
 
 Two sibling folders reimplement the install as self-contained Ansible projects (no paths leak outside the folder). Each has its own `ansible.cfg`, `run.sh`, `inventory/`, and `playbooks/`. **The root-level workflow above does not apply inside these folders.**
 
-- [k8s-setup-w-calico/](k8s-setup-w-calico/) — Calico CNI. Assumes 4 pre-existing Ubuntu 24.04 hosts at the IPs in `inventory/nodes.ini`; no VM provisioning.
-- [k8s-setup-w-cilium/](k8s-setup-w-cilium/) — Cilium CNI variant.
+- [k8s-setup-w-calico/](k8s-setup-w-calico/) — Calico CNI (v3.29.2 via manifest apply), pod CIDR `192.168.0.0/16`.
+- [k8s-setup-w-cilium/](k8s-setup-w-cilium/) — Cilium CNI (1.16.5 via the cilium CLI with `kubeProxyReplacement=true`), pod CIDR `10.244.0.0/16`. Built from the calico folder as a template; the two are **structural mirrors** — same `ansible.cfg`, `run.sh`, `inventory/` layout, same playbook names, same `scripts/fetch-kubeconfig.sh` and `tests/nginx-4-instances.yaml`. They diverge only in: (a) the CNI install block in `install-cluster.yaml`, (b) the CNI-specific interface/state cleanup in `delete-cluster.yaml` (`calico.1` vs `cilium_host`/`cilium_net`/`cilium_vxlan`/`lxc*` veths), (c) the `pod_network_cidr` default, (d) `fetch-kubeconfig.sh` default `CTX_NAME` (`calico-lab` vs `cilium-lab`). When editing shared logic (playbook scaffolding, logging, nginx test), apply the change to both folders.
 
-Key playbooks in each: `install-cluster.yaml`, `delete-cluster.yaml`, `apt-update-upgrade.yaml`, `refresh-apt-keys.yaml` (re-fetches rotated signing keys for third-party apt repos and patches legacy `.list` files to add `signed-by=`), `reboot-hosts.yaml`. The `calico` variant also ships:
+Both assume 4 pre-existing Ubuntu 24.04 hosts at the IPs in `inventory/nodes.ini`; no VM provisioning. SSH key is `inventory/node-ssh-key`. The multipass-flavored variants will live in future `*-on-multipass/` folders with the VM lifecycle scripts.
 
-- [k8s-setup-w-calico/scripts/fetch-kubeconfig.sh](k8s-setup-w-calico/scripts/fetch-kubeconfig.sh) — copies `admin.conf` off the control plane and merges it into `~/.kube/config` with renamed cluster/user/context (`calico-lab`) to avoid x509 errors from kubeadm's default names colliding with existing kubeconfigs. Supports `--standalone <path>` and env overrides `CP_IP`, `SSH_USER`, `SSH_KEY`, `CTX_NAME`.
-- [k8s-setup-w-calico/tests/nginx-4-instances.yaml](k8s-setup-w-calico/tests/nginx-4-instances.yaml) — 4-replica nginx smoke test (NodePort 30080, Downward-API-rendered index showing pod name/IP/node/hostname). Uses `topologySpreadConstraints` to spread across the 4 nodes.
+Shared playbooks in each: `install-cluster.yaml`, `delete-cluster.yaml`, `apt-update-upgrade.yaml`, `refresh-apt-keys.yaml` (re-fetches rotated signing keys for third-party apt repos and patches legacy `.list` files to add `signed-by=`), `reboot-hosts.yaml`.
+
+Shared helpers:
+
+- `scripts/fetch-kubeconfig.sh` — copies `admin.conf` off the control plane and merges it into `~/.kube/config` with renamed cluster/user/context to avoid x509 errors from kubeadm's default names colliding with existing kubeconfigs. Supports `--standalone <path>` and env overrides `CP_IP`, `SSH_USER`, `SSH_KEY`, `CTX_NAME`.
+- `tests/nginx-4-instances.yaml` — 4-replica nginx smoke test (NodePort 30080, Downward-API-rendered index showing pod name/IP/node/hostname). Uses `topologySpreadConstraints` to spread across the 4 nodes. CNI-agnostic.
 
 Logging: both `run.sh` and `fetch-kubeconfig.sh` tee output to `logs/` (gitignored) with start/end banners and exit codes. `run.sh` also sets `ANSIBLE_LOG_PATH=logs/ansible-<playbook>-<timestamp>.log` for a structured Ansible log alongside the terminal transcript. When debugging failures inside these folders, check `logs/` first.
 
-SSH key in these folders is `inventory/node-ssh-key` (not `multipass-ssh-key`). The multipass-flavored variant will live in a future `k8s-setup-w-calico-on-multipass/` folder with the VM lifecycle scripts.
+Note on `run.sh`: it invokes `ansible-playbook -b -K`, which prompts interactively for the BECOME (sudo) password. Passwordless sudo on the nodes is a documented prerequisite, but the `-K` prompt still appears — just hit Enter if sudo is passwordless, or supply the password otherwise. This makes the script unusable from non-TTY contexts (e.g., automated runners); invoke `ansible-playbook` directly in those cases.
 
 ## Lab modules
 
