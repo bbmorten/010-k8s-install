@@ -53,12 +53,12 @@
       shell: |
         ip link delete cni0 || true
         ip link delete flannel.1 || true
-        ip link delete calico.1 || true
         ip link delete cilium_host || true
         ip link delete cilium_net || true
         ip link delete cilium_vxlan || true
-        ip link delete cilium_geneve || true
-        for lxc in $(ip -o link show | awk -F': ' '/lxc/ {print $2}' | cut -d@ -f1); do ip link delete "$lxc" || true; done
+        for link in $(ip -br link show type veth 2>/dev/null | awk '/^lxc/ {print $1}' | cut -d@ -f1); do
+          ip link delete "$link" || true
+        done
       changed_when: false
       ignore_errors: true
 
@@ -162,20 +162,21 @@
       ignore_errors: true
       when: "'workers' in group_names"
 
-    - name: Remove Cilium CLI binary
+    - name: Remove cilium CLI binary
       file:
         path: /usr/local/bin/cilium
         state: absent
       ignore_errors: true
 
-    - name: Remove Cilium runtime state
+    - name: Remove cilium state directories
       file:
         path: "{{ item }}"
         state: absent
       loop:
         - /var/run/cilium
-        - /sys/fs/bpf/tc/globals
+        - /sys/fs/bpf/tc
       ignore_errors: true
+      when: "'control_plane' in group_names"
 
     - name: Verify Kubernetes components are removed
       shell: dpkg -l | grep -E 'kube|containerd'

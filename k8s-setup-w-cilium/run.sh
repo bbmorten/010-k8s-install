@@ -55,6 +55,34 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Set the Ansible config environment variable
 export ANSIBLE_CONFIG="${SCRIPT_DIR}/ansible.cfg"
 
+# -----------------------------------------------------------------------------
+# Logging — tee all stdout/stderr to logs/run-<playbook>-<timestamp>.log
+# -----------------------------------------------------------------------------
+LOG_DIR="${SCRIPT_DIR}/logs"
+mkdir -p "$LOG_DIR"
+ts="$(date +%Y%m%d-%H%M%S)"
+playbook_tag="$(basename "${playbook_file%.*}")"
+LOG_FILE="${LOG_DIR}/run-${playbook_tag}-${ts}.log"
+
+# Ansible verbose/structured output alongside the terminal log
+export ANSIBLE_LOG_PATH="${LOG_DIR}/ansible-${playbook_tag}-${ts}.log"
+
+# Redirect all subsequent output to both terminal and log file
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "==================================================================="
+echo "run.sh start: $(date -Iseconds)"
+echo "  host:       $(hostname)"
+echo "  user:       $(whoami)"
+echo "  cwd:        $(pwd)"
+echo "  playbook:   $playbook_file"
+echo "  flags:      debug=$debug_mode syntax_check=$syntax_check check_mode=$check_mode"
+echo "  log:        $LOG_FILE"
+echo "  ansible:    $ANSIBLE_LOG_PATH"
+echo "==================================================================="
+
+trap 'rc=$?; echo "==================================================================="; echo "run.sh end:   $(date -Iseconds)  exit=$rc"; echo "==================================================================="' EXIT
+
 # Base Ansible command with the provided playbook file
 ansible_command="ansible-playbook -b -K $playbook_file "
 

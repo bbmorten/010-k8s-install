@@ -15,13 +15,21 @@
       apt:
         update_cache: yes
         cache_valid_time: 3600
-      
+        lock_timeout: 300
+
+    - name: Hold trivy (upstream repo index references deleted .deb files)
+      ansible.builtin.dpkg_selections:
+        name: trivy
+        selection: hold
+      failed_when: false
+
     - name: Upgrade all packages
       apt:
         upgrade: yes
         update_cache: no
         cache_valid_time: 3600
         autoremove: yes
+        lock_timeout: 300
       register: upgrade_result
       
     - name: Show upgrade results
