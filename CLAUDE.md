@@ -52,7 +52,12 @@ Two sibling folders reimplement the install as self-contained Ansible projects (
 - [k8s-setup-w-calico/](k8s-setup-w-calico/) — Calico CNI. Assumes 4 pre-existing Ubuntu 24.04 hosts at the IPs in `inventory/nodes.ini`; no VM provisioning.
 - [k8s-setup-w-cilium/](k8s-setup-w-cilium/) — Cilium CNI variant.
 
-Key playbooks in each: `install-cluster.yaml`, `delete-cluster.yaml`, `apt-update-upgrade.yaml`, `refresh-apt-keys.yaml` (re-fetches rotated signing keys for third-party apt repos and patches legacy `.list` files to add `signed-by=`), `reboot-hosts.yaml`. The `calico` variant also ships [k8s-setup-w-calico/scripts/fetch-kubeconfig.sh](k8s-setup-w-calico/scripts/fetch-kubeconfig.sh), which copies `admin.conf` off the control plane and merges it into `~/.kube/config` with renamed cluster/user/context (`calico-lab`) to avoid x509 errors from kubeadm's default names colliding with existing kubeconfigs.
+Key playbooks in each: `install-cluster.yaml`, `delete-cluster.yaml`, `apt-update-upgrade.yaml`, `refresh-apt-keys.yaml` (re-fetches rotated signing keys for third-party apt repos and patches legacy `.list` files to add `signed-by=`), `reboot-hosts.yaml`. The `calico` variant also ships:
+
+- [k8s-setup-w-calico/scripts/fetch-kubeconfig.sh](k8s-setup-w-calico/scripts/fetch-kubeconfig.sh) — copies `admin.conf` off the control plane and merges it into `~/.kube/config` with renamed cluster/user/context (`calico-lab`) to avoid x509 errors from kubeadm's default names colliding with existing kubeconfigs. Supports `--standalone <path>` and env overrides `CP_IP`, `SSH_USER`, `SSH_KEY`, `CTX_NAME`.
+- [k8s-setup-w-calico/tests/nginx-4-instances.yaml](k8s-setup-w-calico/tests/nginx-4-instances.yaml) — 4-replica nginx smoke test (NodePort 30080, Downward-API-rendered index showing pod name/IP/node/hostname). Uses `topologySpreadConstraints` to spread across the 4 nodes.
+
+Logging: both `run.sh` and `fetch-kubeconfig.sh` tee output to `logs/` (gitignored) with start/end banners and exit codes. `run.sh` also sets `ANSIBLE_LOG_PATH=logs/ansible-<playbook>-<timestamp>.log` for a structured Ansible log alongside the terminal transcript. When debugging failures inside these folders, check `logs/` first.
 
 SSH key in these folders is `inventory/node-ssh-key` (not `multipass-ssh-key`). The multipass-flavored variant will live in a future `k8s-setup-w-calico-on-multipass/` folder with the VM lifecycle scripts.
 
