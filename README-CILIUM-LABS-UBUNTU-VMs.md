@@ -41,6 +41,7 @@ bash ./run.sh apt-update-upgrade.yaml
 ## Step 2 - Delete cluster installation (if exists)
 
 ```shell title='HOST'
+chmod 600 inventory/multipass-ssh-key
 bash ./run.sh ./delete-cluster-v2.yaml
 
 ```
