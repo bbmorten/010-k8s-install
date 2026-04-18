@@ -61,6 +61,8 @@ Shared helpers:
 - `scripts/fetch-kubeconfig.sh` — copies `admin.conf` off the control plane and merges it into `~/.kube/config` with renamed cluster/user/context to avoid x509 errors from kubeadm's default names colliding with existing kubeconfigs. Supports `--standalone <path>` and env overrides `CP_IP`, `SSH_USER`, `SSH_KEY`, `CTX_NAME`.
 - `tests/nginx-4-instances.yaml` — 4-replica nginx smoke test (NodePort 30080, Downward-API-rendered index showing pod name/IP/node/hostname). Uses `topologySpreadConstraints` to spread across the 4 nodes. CNI-agnostic.
 
+Cilium-folder-only docs: [k8s-setup-w-cilium/README-HUBBLE.md](k8s-setup-w-cilium/README-HUBBLE.md) walks through installing the `cilium`/`hubble` CLIs on the host, enabling Hubble + Relay + UI, and `cilium hubble port-forward` for host-side `hubble observe`. [k8s-setup-w-cilium/README-TRAFFIC-GEN.md](k8s-setup-w-cilium/README-TRAFFIC-GEN.md) shows cross-namespace curl traffic against the `nginx-hello` service for Hubble flow demos.
+
 Logging: both `run.sh` and `fetch-kubeconfig.sh` tee output to `logs/` (gitignored) with start/end banners and exit codes. `run.sh` also sets `ANSIBLE_LOG_PATH=logs/ansible-<playbook>-<timestamp>.log` for a structured Ansible log alongside the terminal transcript. When debugging failures inside these folders, check `logs/` first.
 
 Note on `run.sh`: it invokes `ansible-playbook -b -K`, which prompts interactively for the BECOME (sudo) password. Passwordless sudo on the nodes is a documented prerequisite, but the `-K` prompt still appears — just hit Enter if sudo is passwordless, or supply the password otherwise. This makes the script unusable from non-TTY contexts (e.g., automated runners); invoke `ansible-playbook` directly in those cases.
